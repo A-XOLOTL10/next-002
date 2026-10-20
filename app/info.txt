@@ -1,0 +1,4 @@
+username DB = divineezenagu10_db_user
+password = iraNGVl2CWkLbikD
+
+uri = mongodb+srv://<db_username>:<db_password>@dev-events-cluster.zjlvpby.mongodb.net/
