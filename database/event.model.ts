@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model } from "mongoose";
+import mongoose, { Schema, model, models, mongo, type Model } from "mongoose";
 
 export const EVENT_MODES = ["online", "offline", "hybrid"] as const;
 export type EventMode = (typeof EVENT_MODES)[number];
@@ -20,6 +20,24 @@ export interface IEvent {
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** True for MongoDB's E11000 unique-index violation. */
+export const isDuplicateKeyError = (error: Error): boolean =>
+  error instanceof mongo.MongoServerError && error.code === 11000;
+
+/**
+ * Builds a standard Mongoose ValidationError so callers can handle every
+ * client-side mistake with a single `error.name === "ValidationError"` check.
+ */
+export function validationError(
+  path: string,
+  message: string,
+  value: unknown,
+): mongoose.Error.ValidationError {
+  const error = new mongoose.Error.ValidationError();
+  error.addError(path, new mongoose.Error.ValidatorError({ path, message, value }));
+  return error;
 }
 
 // `required` + `trim` rejects missing values and whitespace-only strings.
@@ -53,7 +71,8 @@ const EventSchema = new Schema<IEvent>(
     organizer: requiredString,
     tags: nonEmptyStringArray,
   },
-  { timestamps: true },
+  // bufferCommands: false makes queries issued before connectToDatabase() fail immediately instead of hanging.
+  { timestamps: true, bufferCommands: false },
 );
 
 EventSchema.index({ slug: 1 }, { unique: true });
@@ -118,6 +137,15 @@ EventSchema.pre("save", function () {
 
   if (this.isModified("date")) this.date = normalizeDate(this.date);
   if (this.isModified("time")) this.time = normalizeTime(this.time);
+});
+
+// Two events with the same title produce the same slug; report that clearly instead of a raw E11000.
+EventSchema.post("save", { errorHandler: true }, function (error, _res, next) {
+  next(
+    isDuplicateKeyError(error)
+      ? validationError("title", "An event with this title already exists", this.title)
+      : error,
+  );
 });
 
 // Reuse the compiled model across hot reloads to avoid OverwriteModelError.
