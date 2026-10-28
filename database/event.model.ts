@@ -4,6 +4,7 @@ export const EVENT_MODES = ["online", "offline", "hybrid"] as const;
 export type EventMode = (typeof EVENT_MODES)[number];
 
 export interface IEvent {
+  
   title: string;
   slug: string;
   description: string;
@@ -131,12 +132,27 @@ EventSchema.pre("save", function () {
   // Only regenerate the slug when the title changes, so existing URLs stay stable.
   if (this.isModified("title") || !this.slug) {
     const slug = slugify(this.title);
-    if (!slug) throw new Error("Title must contain at least one letter or number");
+    if (!slug) {
+      throw validationError("title", "Title must contain at least one letter or number", this.title);
+    }
     this.slug = slug;
   }
 
-  if (this.isModified("date")) this.date = normalizeDate(this.date);
-  if (this.isModified("time")) this.time = normalizeTime(this.time);
+  // Surface normalization failures as ValidationErrors on the offending path, so callers can return a 400.
+  if (this.isModified("date")) {
+    try {
+      this.date = normalizeDate(this.date);
+    } catch (e) {
+      throw validationError("date", (e as Error).message, this.date);
+    }
+  }
+  if (this.isModified("time")) {
+    try {
+      this.time = normalizeTime(this.time);
+    } catch (e) {
+      throw validationError("time", (e as Error).message, this.time);
+    }
+  }
 });
 
 // Two events with the same title produce the same slug; report that clearly instead of a raw E11000.

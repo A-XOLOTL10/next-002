@@ -65,7 +65,7 @@ function getMongoUri(): string {
  * Once connected, the driver reconnects automatically after network drops,
  * so the cached instance stays valid and is not recreated here.
  */
-export async function connectToDatabase(): Promise<Mongoose> {
+export async function connectDB(): Promise<Mongoose> {
   // Reuse an established connection.
   if (cached.conn) return cached.conn;
 
@@ -89,4 +89,4 @@ export async function connectToDatabase(): Promise<Mongoose> {
   return cached.conn;
 }
 
-export default connectToDatabase;
+export default connectDB;
