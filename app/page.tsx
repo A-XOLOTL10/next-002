@@ -1,47 +1,52 @@
+// Why "use cache" on the whole page: it uses no request-time data (no params,
+// cookies or search params), so the full page, events included, can be
+// prerendered and served from cache instead of querying MongoDB on every visit.
+// (proxy.ts runs before the cache, so the first-visit redirect to the login page
+// doesn't stop this page being static.)
 "use cache"
 
-import EventCard from "@/components/EventCard"
+import Link from "next/link"
+import { cacheLife, cacheTag } from "next/cache"
 import ExploreBtn from "@/components/ExploreBtn"
+import EventList from "@/components/EventList"
 import { events as bundledEvents, type EventItem } from "@/lib/constants"
+import { getEventCards } from "@/lib/actions/events.actions"
+import { EVENTS_TAG } from "@/lib/cache-tags"
+import { todayISODate } from "@/lib/utils"
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+const FEATURED_LIMIT = 6
 
 const page = async () => {
+  // "hours" also bounds how long an event that just ended stays in the upcoming list.
+  cacheLife("hours")
+  // Tagged so creating, editing or deleting an event refreshes the homepage right away.
+  cacheTag(EVENTS_TAG)
 
-  // Without a base URL (e.g. CI builds) there's no API to call; show the bundled sample events instead.
-  // Events from the API carry a MongoDB _id; the bundled samples don't.
-  let events: (EventItem & { _id?: string })[] = bundledEvents
+  // Reads MongoDB directly instead of fetching our own /api/events: at build time
+  // no server is running to answer that request, so a cached self-fetch can hang.
+  // Without a database configured (e.g. CI builds), show the bundled sample events.
+  // Database errors propagate to app/error.tsx (and are never cached).
+  const events: (EventItem & { _id?: string })[] = process.env.MONGODB_URI ? await getEventCards() : bundledEvents
 
-  if (BASE_URL) {
-    const resonse = await fetch(`${BASE_URL}/api/events`)
-
-    // Surface API failures to app/error.tsx instead of rendering a silently empty list.
-    if (!resonse.ok) throw new Error(`Failed to load events (HTTP ${resonse.status})`)
-
-    events = (await resonse.json()).events ?? []
-  }
+  // Reading today's date inside a cached scope is fine: it's frozen into this cache entry,
+  // which is rebuilt at least hourly.
+  const today = todayISODate()
+  const upcoming = events.filter((event) => event.date >= today).slice(0, FEATURED_LIMIT)
 
   return (
     <section>
-      <h1 className=" text-center">The Hub for Every Developers <br /> Event You Must Attend</h1>
+      <h1 className="text-center">The Hub for Every Developers <br /> Event You Must Attend</h1>
       <p className="text-center mt-5">Hackathons, Greet & Meetups and Conferences. All in one place.</p>
 
       <ExploreBtn />
 
-      <div className="mt-20 space-y-7">
-    <h3>Featured Events</h3>
+      <div id="events" className="mt-20 space-y-7 scroll-mt-24">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <h3>Upcoming Events</h3>
+          <Link href="/events" className="text-sm hover:underline">See all events &rarr;</Link>
+        </div>
 
-    <ul className="events">
-      {
-        events && events.length > 0 &&
-        events.map((event) => (
-          // Unique per event (titles can repeat); slug is unique too, for bundled samples without an _id.
-          <li className="list-none"  key={event._id ?? event.slug}>
-            <EventCard {...event} />
-          </li>
-        ))
-      }
-    </ul>
+        <EventList events={upcoming} emptyText="No upcoming events right now. Check back soon!" />
       </div>
     </section>
   )

@@ -1,40 +1,49 @@
 import { Suspense } from "react"
 import { notFound } from "next/navigation"
+import { connection } from "next/server"
 import Image from "next/image"
 import { cacheLife, cacheTag } from "next/cache"
 import connectDB from "@/lib/mongodb"
-import Event from "@/database/event.model"
 import Booking from "@/database/booking.model"
 import BookEvents from "@/components/BookEvents"
-import { getSimilarEventsBySlug } from "@/lib/actions/events.actions"
+import { getEventBySlug, getSimilarEventsBySlug } from "@/lib/actions/events.actions"
 import EventCard from "@/components/EventCard"
-import { toList } from "@/lib/utils"
+import { isPastEvent, toList } from "@/lib/utils"
+import { bookingsTag } from "@/lib/cache-tags"
 
+// Caching on this page:
+// - The page itself is NOT cached: it awaits `params`, which is request-time data.
+//   Wrapping that in "use cache" makes Next wait for data it can't get during
+//   prerendering and time out (~50s). Instead, the slug is read inside <Suspense>.
+// - Every database read IS cached (getEventBySlug, getSimilarEventsBySlug, and
+//   getBookingCount below), so repeat visits to an event skip MongoDB.
+// - The small display components (EventDetailItem, EventAgenda, EventTags) aren't
+//   cached: they do no I/O, so caching them would add overhead and save nothing.
 
-
-// Cached DB read: repeat visits skip MongoDB. Queried directly rather than via
-// /api/events/[slug], which would add an HTTP hop and fail at build time.
-async function getEventBySlug(slug: string) {
-  "use cache"
-  cacheLife("minutes")
-  cacheTag(`event-${slug}`)
-
-  await connectDB()
-  const event = await Event.findOne({ slug: slug.toLowerCase() }).lean()
-  if (!event) return null
-
-  // ObjectId isn't serializable across the cache/RSC boundary; send it as a string.
-  return { ...event, _id: event._id.toString() }
-}
-
-// Tagged so createBooking can refresh it immediately with updateTag().
+// Why "use cache": the count is shown on every visit but only changes when someone
+// confirms a booking. confirmBooking clears this tag with updateTag(), so the booker sees the
+// new count immediately. "minutes" bounds staleness for other visitors on
+// serverless hosts, where each instance has its own in-memory cache.
 async function getBookingCount(eventId: string) {
   "use cache"
   cacheLife("minutes")
-  cacheTag(`bookings-${eventId}`)
+  cacheTag(bookingsTag(eventId))
 
   await connectDB()
-  return Booking.countDocuments({ eventId })
+  // Only confirmed bookings count: pending ones haven't verified their email yet.
+  return Booking.countDocuments({ eventId, status: "confirmed" })
+}
+
+// Past events can't be booked (the server rejects it too), so don't offer a form that can only fail.
+// "Has it ended?" depends on today's date, which can't be baked into a prerendered page, so
+// connection() makes just this small piece render at request time; the rest stays prerenderable.
+async function BookingForm({ eventId, date }: { eventId: string; date: string }) {
+  await connection()
+
+  if (isPastEvent(date)) {
+    return <p className="text-sm">This event has ended. Bookings are closed.</p>
+  }
+  return <BookEvents eventId={eventId} />
 }
 
 const EventDetailItem = ({ icon, alt, label }: { icon: string, alt: string, label: string }) => {
@@ -89,16 +98,21 @@ const EventDetails = async ({ params }: Pick<PageProps<"/events/[slug]">, "param
 
   if (!event) notFound()
 
-  const { _id, description, image, overview, date, time, location, mode, agenda, audience, tags, organizer } = event
+  const { _id, title, description, image, overview, date, time, location, mode, agenda, audience, tags, organizer } = event
 
   const bookings = await getBookingCount(_id);
 
-  const similarEvents = await getSimilarEventsBySlug(slug);
+  // Similar events are optional: if the query fails, render the page without them.
+  // Caught here, outside the cache, so the failure itself is never cached.
+  const similarEvents = await getSimilarEventsBySlug(slug).catch((e: unknown) => {
+    console.error("Failed to load similar events:", e)
+    return []
+  });
 
   return (
     <>
       <div className="header">
-        <h1>Event Description</h1>
+        <h1>{title}</h1>
         <p>{description}</p>
       </div>
 
@@ -108,7 +122,7 @@ const EventDetails = async ({ params }: Pick<PageProps<"/events/[slug]">, "param
         {/* {Left side} */}
 
         <div className="content">
-          <Image src={image} alt="Event" width={800} height={800} className="" />
+          <Image src={image} alt={title} width={800} height={457} className="banner" priority />
           <section className="flex-col-gap-2">
             <h2>Event Overview</h2>
             <p>{overview}</p>
@@ -152,7 +166,9 @@ const EventDetails = async ({ params }: Pick<PageProps<"/events/[slug]">, "param
               )
             }
 
-            <BookEvents eventId={_id} />
+            <Suspense fallback={null}>
+              <BookingForm eventId={_id} date={date} />
+            </Suspense>
 
           </div>
         </aside>

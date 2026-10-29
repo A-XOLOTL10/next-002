@@ -1,7 +1,8 @@
 import mongoose, { Schema, model, models, mongo, type Model } from "mongoose";
 
-export const EVENT_MODES = ["online", "offline", "hybrid"] as const;
-export type EventMode = (typeof EVENT_MODES)[number];
+import { EVENT_MODES, type EventMode } from "./event.constants";
+
+export { EVENT_MODES, type EventMode };
 
 export interface IEvent {
   

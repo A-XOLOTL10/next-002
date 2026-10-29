@@ -3,17 +3,26 @@
 import { useActionState, useState } from "react"
 import { createBooking, type BookingState } from "@/lib/actions/booking.actions"
 
-const initialState: BookingState = { status: "idle", message: "" }
+const initialState: BookingState = { status: "idle" }
 
 const BookEvents = ({ eventId }: { eventId: string }) => {
   // Controlled so the typed email survives a failed submission (React resets uncontrolled form fields).
   const [email, setEmail] = useState("")
   const [state, formAction, pending] = useActionState(createBooking.bind(null, eventId), initialState)
 
-  if (state.status === "success") {
+  // Step 1 done: the booking is pending until the visitor clicks the emailed link.
+  if (state.status === "pending") {
     return (
-      <div id="book-event">
-        <p className="text-sm" role="status">{state.message}</p>
+      <div id="book-event" role="status" className="flex flex-col gap-3">
+        <p className="font-semibold">Almost there! Check your email to confirm.</p>
+        <p className="text-sm">
+          We&apos;ve sent a confirmation link to <strong>{state.email}</strong>. Open it to confirm your spot. Your
+          ticket ID will be emailed to you as soon as you confirm.
+        </p>
+        <p className="text-sm">
+          Can&apos;t find it? Check your <strong>spam or junk folder</strong>. The link expires in 24 hours. To get a new
+          link, just book again with the same email.
+        </p>
       </div>
     )
   }
@@ -43,8 +52,9 @@ const BookEvents = ({ eventId }: { eventId: string }) => {
 
         {/* Disabled while pending to prevent double submissions. */}
         <button type="submit" disabled={pending}>
-          {pending ? "Booking..." : "Submit"}
+          {pending ? "Booking..." : "Book my free spot"}
         </button>
+        <p className="text-xs text-light-200">Free event. We&apos;ll email you a link to confirm your booking.</p>
       </form>
     </div>
   )
