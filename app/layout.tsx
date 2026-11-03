@@ -28,7 +28,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={cn("h-full", "antialiased", schibstedGrotesk.variable, martianMono.variable, "font-sans", geist.variable)}
     >
-      <body className=" min-h-full flex flex-col">
+      {/* Extensions like Grammarly inject attributes on <body> before hydration; ignore those mismatches here only. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
 
         <Navbar />
 
