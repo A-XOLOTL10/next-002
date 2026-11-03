@@ -1,0 +1,9 @@
+[33m9893e95[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev/adminDashboard-setup[m[33m, [m[1;32mfeature/database-setup[m[33m)[m admin panel UI completed
+[33ma7027f9[m ;ogin and session implementation
+[33m7000b1b[m[33m ([m[1;31morigin/feature/database-setup[m[33m)[m dev events and tags applied to show similar events with a book event spot form
+[33mcd54ff7[m loose end connection time out errors fixed
+[33mdceee29[m dabase models implementation
+[33ma58805c[m[33m ([m[1;31morigin/database-setup[m[33m, [m[1;32mdatabase-setup[m[33m)[m Configure PostHog
+[33ma78ceb3[m deleted hello test
+[33m27a126d[m test changes
+[33mdd4a009[m Building a Dev event web and app using next.js

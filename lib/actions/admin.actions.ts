@@ -122,6 +122,7 @@ export async function publishEventsAction(
   const check = await verifyPublishPin(pin)
   if (check === "wrong") return { message: "That PIN is incorrect." }
   if (check === "locked") return { message: "Too many wrong PINs. Try again in 15 minutes." }
+  if (check === "unconfigured") return { message: "Publishing isn't set up yet: ADMIN_PUBLISH_PIN is missing on the server." }
 
   const result = await publishEvents(slugs)
   if (!result.ok) return { message: result.message }

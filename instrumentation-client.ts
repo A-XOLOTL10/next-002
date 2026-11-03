@@ -1,7 +1,16 @@
-import posthog, { type BeforeSendFn } from "posthog-js";
+import posthog, { type BeforeSendFn, type Properties } from "posthog-js";
 
 const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+
+const TOKEN_IN_URL = /([?&]token=)[^&#\s]*/g;
+
+/** PostHog copies the first URL of a visit into later events ($session_entry_url, $initial_current_url...). */
+const redactTokens = (props?: Properties): Properties | undefined =>
+  props &&
+  Object.fromEntries(
+    Object.entries(props).map(([key, value]) => [key, typeof value === "string" ? value.replace(TOKEN_IN_URL, "$1redacted") : value]),
+  );
 
 /**
  * Keeps private details out of analytics. Admin pages hold attendees' emails, and booking
@@ -9,8 +18,13 @@ const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST;
  */
 const keepPrivateDataOut: BeforeSendFn = (event) => {
   const url = event?.properties?.$current_url;
-  if (typeof url === "string" && /\/(admin|bookings\/confirm)(\/|\?|$)/.test(url)) return null;
-  return event;
+  if (!event || (typeof url === "string" && /\/(admin|bookings\/confirm)(\/|\?|$)/.test(url))) return null;
+  return {
+    ...event,
+    properties: redactTokens(event.properties) ?? {},
+    $set: redactTokens(event.$set),
+    $set_once: redactTokens(event.$set_once),
+  };
 };
 
 if (!posthogKey || !posthogHost) {

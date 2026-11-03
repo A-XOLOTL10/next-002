@@ -149,7 +149,8 @@ function slugify(title: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "") // drop punctuation
     .trim()
-    .replace(/[\s-]+/g, "-"); // collapse whitespace/hyphens into single hyphens
+    .replace(/[\s-]+/g, "-") // collapse whitespace/hyphens into single hyphens
+    .replace(/^-+|-+$/g, ""); // no leading/trailing hyphen: the API's slug check rejects them
 }
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -206,6 +207,12 @@ EventSchema.pre("validate", function () {
 });
 
 EventSchema.pre("save", async function () {
+  // Normalized first: the slug below takes the year from `date`, which must be YYYY-MM-DD by then.
+  if (this.date && this.isModified("date")) this.date = normalized("date", this.date, normalizeDate);
+  if (this.time && this.isModified("time")) this.time = normalized("time", this.time, normalizeTime);
+  if (this.endDate && this.isModified("endDate")) this.endDate = normalized("endDate", this.endDate, normalizeDate);
+  if (this.endTime && this.isModified("endTime")) this.endTime = normalized("endTime", this.endTime, normalizeTime);
+
   // The slug is fixed once published: changing it would break links already shared and emailed.
   if (this.isNew || !this.slug || (this.status === "draft" && this.isModified("title"))) {
     const EventModel = this.constructor as Model<IEvent>;
@@ -227,11 +234,6 @@ EventSchema.pre("save", async function () {
 
     this.slug = slug;
   }
-
-  if (this.date && this.isModified("date")) this.date = normalized("date", this.date, normalizeDate);
-  if (this.time && this.isModified("time")) this.time = normalized("time", this.time, normalizeTime);
-  if (this.endDate && this.isModified("endDate")) this.endDate = normalized("endDate", this.endDate, normalizeDate);
-  if (this.endTime && this.isModified("endTime")) this.endTime = normalized("endTime", this.endTime, normalizeTime);
 
   if (this.date && this.time) {
     const times = computeEventTimes({
