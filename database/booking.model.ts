@@ -18,6 +18,8 @@ export interface IBooking {
   /** When the confirmation link stops working (and the pending booking is auto-deleted). Pending only. */
   verificationExpiresAt?: Date;
   confirmedAt?: Date;
+  /** When the ticket's QR code was scanned at the door. A ticket can only be used once. */
+  checkedInAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,7 +54,8 @@ const BookingSchema = new Schema<IBooking>(
         message: "{VALUE} is not a valid email address",
       },
     },
-    // Generated on create; unique so it can be used to look a booking up.
+    // Generated on create. The unique index covers all events, and the QR code encodes this
+    // ID, so no two tickets anywhere can ever share a QR code.
     ticketId: { type: String, required: true, unique: true, default: generateTicketId },
     status: { type: String, enum: BOOKING_STATUSES, required: true, default: "pending" },
     // select: false keeps the hash out of every query result unless explicitly asked for.
@@ -60,6 +63,7 @@ const BookingSchema = new Schema<IBooking>(
     verificationTokenHash: { type: String, select: false, index: { unique: true, sparse: true } },
     verificationExpiresAt: { type: Date },
     confirmedAt: { type: Date },
+    checkedInAt: { type: Date },
   },
   // bufferCommands: false makes queries issued before connectToDatabase() fail immediately instead of hanging.
   { timestamps: true, bufferCommands: false },

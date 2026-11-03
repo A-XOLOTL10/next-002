@@ -4,6 +4,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { connection } from "next/server"
 import { ADMIN_SESSION_COOKIE } from "@/lib/session-cookies"
+import { LIMITS, clientIp, consumeAttempt, isLockedOut } from "@/lib/rate-limit"
 
 // Admin auth, kept deliberately simple: one admin account from environment variables,
 // and a stateless session cookie of the form "<expiresAtMs>.<signature>". The signature
@@ -15,8 +16,8 @@ const SESSION_DURATION_MS = 8 * 60 * 60 * 1000 // 8 hours
 
 function getSecret(): string {
   const secret = process.env.ADMIN_SESSION_SECRET
-  if (!secret || secret.length < 32) {
-    throw new Error("ADMIN_SESSION_SECRET must be set to at least 32 characters.")
+  if (!secret || secret.length < 32 || /[<>]/.test(secret)) {
+    throw new Error("ADMIN_SESSION_SECRET must be a random value of at least 32 characters (not the placeholder text).")
   }
   return secret
 }
@@ -31,7 +32,7 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /** True if the email/password match the admin credentials in the environment. */
-export function checkAdminCredentials(email: string, password: string): boolean {
+function checkAdminCredentials(email: string, password: string): boolean {
   const adminEmail = process.env.ADMIN_EMAIL
   const adminPassword = process.env.ADMIN_PASSWORD
   if (!adminEmail || !adminPassword) {
@@ -42,6 +43,43 @@ export function checkAdminCredentials(email: string, password: string): boolean 
   const emailMatches = safeEqual(email.trim().toLowerCase(), adminEmail.trim().toLowerCase())
   const passwordMatches = safeEqual(password, adminPassword)
   return emailMatches && passwordMatches
+}
+
+export type SignInResult = "ok" | "invalid" | "locked" | "unconfigured"
+
+/**
+ * The whole admin sign-in, shared by the login form and POST /api/auth/login. Five wrong
+ * attempts from one address lock it out for 15 minutes, which stops password guessing.
+ * Must be called from a Server Action or Route Handler, because it sets a cookie.
+ */
+export async function signInAdmin(email: string, password: string): Promise<SignInResult> {
+  const attemptKey = `login:${await clientIp()}`
+  if (await isLockedOut(attemptKey, LIMITS.login)) return "locked"
+
+  try {
+    getSecret() // check this first, so a bad secret is reported rather than a failed sign-in
+    if (!checkAdminCredentials(email, password)) {
+      await consumeAttempt(attemptKey, LIMITS.login)
+      return "invalid"
+    }
+    await createSession()
+    return "ok"
+  } catch (e) {
+    // A setup problem, not the user's mistake. The server log says exactly which setting is wrong.
+    console.error("Admin login isn't configured:", e instanceof Error ? e.message : e)
+    return "unconfigured"
+  }
+}
+
+/** The final permission to publish. Defaults to 1234; set ADMIN_PUBLISH_PIN to change it. */
+export async function verifyPublishPin(pin: string): Promise<"ok" | "wrong" | "locked"> {
+  const attemptKey = "publish-pin"
+  if (await isLockedOut(attemptKey, LIMITS.publishPin)) return "locked"
+
+  if (safeEqual(pin.trim(), process.env.ADMIN_PUBLISH_PIN?.trim() || "1234")) return "ok"
+
+  await consumeAttempt(attemptKey, LIMITS.publishPin)
+  return "wrong"
 }
 
 /** Sets the session cookie. Only callable from a Server Action or Route Handler. */
@@ -76,7 +114,11 @@ export async function isAdmin(): Promise<boolean> {
   const expiresAt = Number(expiresAtRaw)
   if (!signature || !Number.isFinite(expiresAt) || expiresAt < Date.now()) return false
 
-  return safeEqual(signature, sign(expiresAt))
+  try {
+    return safeEqual(signature, sign(expiresAt))
+  } catch {
+    return false // without a usable secret, no session can be trusted
+  }
 }
 
 /** Use at the top of every admin page and admin Server Action: redirects to login if not signed in. */

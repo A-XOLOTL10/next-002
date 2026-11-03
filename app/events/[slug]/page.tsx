@@ -1,24 +1,27 @@
-import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import { connection } from "next/server"
-import Image from "next/image"
 import { cacheLife, cacheTag } from "next/cache"
 import connectDB from "@/lib/mongodb"
 import Booking from "@/database/booking.model"
 import BookEvents from "@/components/BookEvents"
+import EventList from "@/components/EventList"
+import EventView from "@/components/EventView"
 import { getEventBySlug, getSimilarEventsBySlug } from "@/lib/actions/events.actions"
-import EventCard from "@/components/EventCard"
-import { isPastEvent, toList } from "@/lib/utils"
+import { hasEnded, isHiddenFromVisitors } from "@/lib/utils"
 import { bookingsTag } from "@/lib/cache-tags"
 
+// This page waits for its data before sending anything (instant = false) rather than streaming
+// it in behind <Suspense>. Whether the event exists has to be known before the response starts:
+// a "not found" discovered mid-stream can't change the status code (so search engines would see
+// a 200) and makes React fall back to client rendering (console error #419). The data reads are
+// cached, so the wait is short.
+export const instant = false
+
 // Caching on this page:
-// - The page itself is NOT cached: it awaits `params`, which is request-time data.
-//   Wrapping that in "use cache" makes Next wait for data it can't get during
-//   prerendering and time out (~50s). Instead, the slug is read inside <Suspense>.
+// - The page itself is NOT cached: it awaits `params`, which is request-time data, and whether
+//   an event has ended changes by the minute.
 // - Every database read IS cached (getEventBySlug, getSimilarEventsBySlug, and
 //   getBookingCount below), so repeat visits to an event skip MongoDB.
-// - The small display components (EventDetailItem, EventAgenda, EventTags) aren't
-//   cached: they do no I/O, so caching them would add overhead and save nothing.
 
 // Why "use cache": the count is shown on every visit but only changes when someone
 // confirms a booking. confirmBooking clears this tag with updateTag(), so the booker sees the
@@ -34,172 +37,57 @@ async function getBookingCount(eventId: string) {
   return Booking.countDocuments({ eventId, status: "confirmed" })
 }
 
-// Past events can't be booked (the server rejects it too), so don't offer a form that can only fail.
-// "Has it ended?" depends on today's date, which can't be baked into a prerendered page, so
-// connection() makes just this small piece render at request time; the rest stays prerenderable.
-async function BookingForm({ eventId, date }: { eventId: string; date: string }) {
+export default async function EventDetailsPage({ params }: PageProps<"/events/[slug]">) {
+  // Everything below depends on the current time, so it always runs at request time.
   await connection()
 
-  if (isPastEvent(date)) {
-    return <p className="text-sm">This event has ended. Bookings are closed.</p>
-  }
-  return <BookEvents eventId={eventId} />
-}
-
-const EventDetailItem = ({ icon, alt, label }: { icon: string, alt: string, label: string }) => {
-
-  return (
-
-    <div className="flex-row-gap-2 items-center">
-      <Image src={icon} alt={alt} width={17} height={17} />
-      <p>{label}</p>
-    </div>
-
-  );
-
-}
-
-const EventAgenda = ({ agendaItems }: { agendaItems: string[] }) => {
-  return (
-    <div className="agenda">
-      <h2>Event Agenda</h2>
-      <ul>
-        {agendaItems.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-    </div>
-  )
-
-}
-
-const EventTags = ({ tags }: { tags: string[] }) => {
-
-  return (
-    <div className="flex flex-row gap-1.5 flex-wrap">
-      {tags.map((tag) => (
-        <div key={tag} className="pill">
-          {tag}
-        </div>
-      ))}
-    </div>
-  )
-
-
-}
-
-
-
-// The slug is request-time data, so it's read inside <Suspense> (see EventDetailsPage):
-// the page shell renders instantly and the event details stream in.
-const EventDetails = async ({ params }: Pick<PageProps<"/events/[slug]">, "params">) => {
   const { slug } = await params
   const event = await getEventBySlug(slug)
 
-  if (!event) notFound()
+  // Drafts, and events past the end of their last day, don't exist as far as visitors know.
+  if (!event || isHiddenFromVisitors(event.hideAt)) notFound()
 
-  const { _id, title, description, image, overview, date, time, location, mode, agenda, audience, tags, organizer } = event
-
-  const bookings = await getBookingCount(_id);
+  const ended = hasEnded(event.endsAt)
+  const bookings = await getBookingCount(event._id)
 
   // Similar events are optional: if the query fails, render the page without them.
   // Caught here, outside the cache, so the failure itself is never cached.
   const similarEvents = await getSimilarEventsBySlug(slug).catch((e: unknown) => {
     console.error("Failed to load similar events:", e)
     return []
-  });
+  })
 
-  return (
-    <>
-      <div className="header">
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </div>
-
-      <div className="details">
-
-
-        {/* {Left side} */}
-
-        <div className="content">
-          <Image src={image} alt={title} width={800} height={457} className="banner" priority />
-          <section className="flex-col-gap-2">
-            <h2>Event Overview</h2>
-            <p>{overview}</p>
-          </section>
-
-          <section className="flex-col-gap-2">
-            <h2>Event Details</h2>
-
-            <EventDetailItem icon="/icons/calendar.svg" alt="calendar" label={date} />
-            <EventDetailItem icon="/icons/clock.svg" alt="clock" label={time} />
-            <EventDetailItem icon="/icons/pin.svg" alt="location" label={location} />
-            <EventDetailItem icon="/icons/mode.svg" alt="mode" label={mode} />
-            <EventDetailItem icon="/icons/audience.svg" alt="audience" label={audience} />
-
-          </section>
-
-          <EventAgenda agendaItems={toList(agenda)} />
-
-          <section className="flex-col-gap-2">
-            <h2>About the Organiser</h2>
-            <p>{organizer}</p>
-          </section>
-
-          <EventTags tags={toList(tags)} />
-
-        </div>
-
-        {/* {Right side} */}
-        <aside className="booking">
-          <div className="signup-card">
-            <h2>Book Your Spot</h2>
-            {
-              bookings > 0 ? (
-                <p className="text-sm">
-                  Join {bookings} {bookings === 1 ? "person who has" : "people who have"} already booked their spot!
-                </p>
-              ) : (
-                <p className="text-sm">
-                  Be the first to book your spot!
-                </p>
-              )
-            }
-
-            <Suspense fallback={null}>
-              <BookingForm eventId={_id} date={date} />
-            </Suspense>
-
-          </div>
-        </aside>
-
-
-      </div>
-
-      <div className="flex w-full flex-col gap-4 pt-20">
-        <h2> Similar Events </h2>
-        <div className="events">
-
-          {
-            similarEvents.length > 0 && similarEvents.map((similarEvent) => (
-
-              <EventCard key={similarEvent._id} {...similarEvent} />
-            ))
-          }
-        </div>
-      </div>
-    </>
-  )
-}
-
-const EventDetailsPage = ({ params }: PageProps<"/events/[slug]">) => {
   return (
     <section id="event">
-      <Suspense fallback={<p>Loading event...</p>}>
-        <EventDetails params={params} />
-      </Suspense>
+      <EventView
+        event={event}
+        endedAt={ended ? event.endsAt : undefined}
+        aside={
+          <div className="signup-card">
+            <h2>{ended ? "Bookings Closed" : "Book Your Spot"}</h2>
+
+            {ended ? (
+              <p className="text-sm">This event has ended, so bookings are closed.</p>
+            ) : (
+              <>
+                <p className="text-sm">
+                  {bookings > 0
+                    ? `Join ${bookings} ${bookings === 1 ? "person who has" : "people who have"} already booked their spot!`
+                    : "Be the first to book your spot!"}
+                </p>
+                <BookEvents eventId={event._id} />
+              </>
+            )}
+          </div>
+        }
+      >
+        {similarEvents.length > 0 && (
+          <div className="flex w-full flex-col gap-4 pt-20">
+            <h2>Similar Events</h2>
+            <EventList events={similarEvents} emptyText="" />
+          </div>
+        )}
+      </EventView>
     </section>
   )
 }
-
-export default EventDetailsPage

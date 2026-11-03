@@ -1,4 +1,3 @@
-import { Suspense } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { getEventBookings } from "@/lib/admin-data"
@@ -9,15 +8,16 @@ import DeleteEventButton from "@/components/admin/DeleteEventButton"
 const formatBookedAt = (iso: string): string =>
   new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(iso)) + " UTC"
 
+// Waits for its data before sending anything (instant = false), so a missing event is a real
+// 404 decided before the response starts, instead of a "not found" thrown mid-stream (which
+// makes React fall back to client rendering and log error #419).
+export const instant = false
+
 export default function AdminEventBookingsPage({ params }: PageProps<"/admin/events/[slug]">) {
   return (
     <>
       <AdminNav />
-
-      {/* params and the session cookie are request-time data, so the content streams in. */}
-      <Suspense fallback={<p>Loading bookings...</p>}>
-        <BookingsTable params={params} />
-      </Suspense>
+      <BookingsTable params={params} />
     </>
   )
 }
@@ -71,6 +71,7 @@ async function BookingsTable({ params }: Pick<PageProps<"/admin/events/[slug]">,
                 <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4">Ticket ID</th>
                 <th className="py-3 pr-4">Booked</th>
+                <th className="py-3 pr-4">Checked in</th>
                 <th className="py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -89,6 +90,7 @@ async function BookingsTable({ params }: Pick<PageProps<"/admin/events/[slug]">,
                   {/* The ticket only becomes valid once the visitor confirms their email. */}
                   <td className="py-3 pr-4 font-mono">{booking.status === "confirmed" ? booking.ticketId : "—"}</td>
                   <td className="py-3 pr-4">{formatBookedAt(booking.bookedAt)}</td>
+                  <td className="py-3 pr-4">{booking.checkedInAt ? formatBookedAt(booking.checkedInAt) : "—"}</td>
                   <td className="py-3 text-right">
                     <CancelBookingButton bookingId={booking._id} email={booking.email} />
                   </td>

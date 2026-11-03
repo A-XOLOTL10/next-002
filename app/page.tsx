@@ -8,30 +8,25 @@
 import Link from "next/link"
 import { cacheLife, cacheTag } from "next/cache"
 import ExploreBtn from "@/components/ExploreBtn"
-import EventList from "@/components/EventList"
-import { events as bundledEvents, type EventItem } from "@/lib/constants"
+import EventList, { visibleEvents } from "@/components/EventList"
+import { events as bundledEvents } from "@/lib/constants"
 import { getEventCards } from "@/lib/actions/events.actions"
 import { EVENTS_TAG } from "@/lib/cache-tags"
-import { todayISODate } from "@/lib/utils"
 
 const FEATURED_LIMIT = 6
 
 const page = async () => {
-  // "hours" also bounds how long an event that just ended stays in the upcoming list.
-  cacheLife("hours")
-  // Tagged so creating, editing or deleting an event refreshes the homepage right away.
+  // A short lifetime keeps the order right as events pass. Between rebuilds, each event card
+  // works out "ended" and "hidden" for itself in the browser.
+  cacheLife("minutes")
+  // Tagged so publishing, editing or deleting an event refreshes the homepage right away.
   cacheTag(EVENTS_TAG)
 
   // Reads MongoDB directly instead of fetching our own /api/events: at build time
   // no server is running to answer that request, so a cached self-fetch can hang.
   // Without a database configured (e.g. CI builds), show the bundled sample events.
   // Database errors propagate to app/error.tsx (and are never cached).
-  const events: (EventItem & { _id?: string })[] = process.env.MONGODB_URI ? await getEventCards() : bundledEvents
-
-  // Reading today's date inside a cached scope is fine: it's frozen into this cache entry,
-  // which is rebuilt at least hourly.
-  const today = todayISODate()
-  const upcoming = events.filter((event) => event.date >= today).slice(0, FEATURED_LIMIT)
+  const events = process.env.MONGODB_URI ? await getEventCards() : bundledEvents
 
   return (
     <section>
@@ -46,7 +41,10 @@ const page = async () => {
           <Link href="/events" className="text-sm hover:underline">See all events &rarr;</Link>
         </div>
 
-        <EventList events={upcoming} emptyText="No upcoming events right now. Check back soon!" />
+        <EventList
+          events={visibleEvents(events).slice(0, FEATURED_LIMIT)}
+          emptyText="No upcoming events right now. Check back soon!"
+        />
       </div>
     </section>
   )

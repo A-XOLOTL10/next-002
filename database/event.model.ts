@@ -1,25 +1,50 @@
+import { randomBytes } from "node:crypto";
 import mongoose, { Schema, model, models, mongo, type Model } from "mongoose";
-
-import { EVENT_MODES, type EventMode } from "./event.constants";
+import {
+  DEFAULT_TIMEZONE,
+  EVENT_MODES,
+  EVENT_SOURCES,
+  EVENT_STATUSES,
+  IMAGE_DISPLAYS,
+  IMAGE_RULES,
+  type EventMode,
+  type EventSource,
+  type EventStatus,
+  type ImageDisplay,
+} from "./event.constants";
+import { computeEventTimes, isValidTimezone } from "./event-time";
 
 export { EVENT_MODES, type EventMode };
 
 export interface IEvent {
-  
   title: string;
   slug: string;
   description: string;
   overview: string;
-  image: string;
+  image: string; // the main image: always images[0]
+  images: string[]; // 1 to 5 designs for this event
+  imageDisplay: ImageDisplay;
   venue: string;
   location: string;
   date: string; // ISO date, YYYY-MM-DD
-  time: string; // 24-hour, HH:mm
+  time: string; // start, 24-hour HH:mm
+  endDate?: string; // last day, for multi-day events; defaults to `date`
+  endTime: string; // finish, 24-hour HH:mm
+  timezone: string; // IANA, e.g. Africa/Lagos
   mode: EventMode;
   audience: string;
   agenda: string[];
   organizer: string;
   tags: string[];
+  status: EventStatus;
+  source: EventSource;
+  importNotes: string[]; // what the AI import wants the admin to check
+  publishedAt?: Date;
+  // Exact moments, computed from the local date/time/timezone on save, so events can be
+  // sorted and filtered in the database.
+  startsAt?: Date;
+  endsAt?: Date;
+  hideAt?: Date; // midnight after the last day: visitors no longer see the event
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,42 +67,79 @@ export function validationError(
   return error;
 }
 
-// `required` + `trim` rejects missing values and whitespace-only strings.
-const requiredString = { type: String, required: true, trim: true } as const;
+// Drafts can be incomplete (the AI import may not find everything), so these are only
+// required once an event is published. `trim` turns whitespace-only values into empty ones.
+function isPublished(this: unknown): boolean {
+  return (this as IEvent).status === "published";
+}
+const publishedString = {
+  type: String,
+  trim: true,
+  required: [isPublished, "{PATH} is required"] as [() => boolean, string],
+};
 
 // Mongoose defaults arrays to [], so `required` alone never fails; enforce at least one non-empty item.
-const nonEmptyStringArray = {
+const publishedStringArray = {
   type: [String],
-  required: true,
   validate: {
-    validator: (items: string[]): boolean =>
-      items.length > 0 && items.every((item) => item.trim().length > 0),
+    validator(this: unknown, items: string[]): boolean {
+      if (!isPublished.call(this) && items.length === 0) return true;
+      return items.length > 0 && items.every((item) => item.trim().length > 0);
+    },
     message: "{PATH} must contain at least one non-empty item",
   },
 };
 
 const EventSchema = new Schema<IEvent>(
   {
-    title: requiredString,
+    title: { type: String, required: true, trim: true },
     slug: { type: String, lowercase: true, trim: true },
-    description: requiredString,
-    overview: requiredString,
-    image: requiredString,
-    venue: requiredString,
-    location: requiredString,
-    date: requiredString,
-    time: requiredString,
-    mode: { ...requiredString, lowercase: true, enum: EVENT_MODES },
-    audience: requiredString,
-    agenda: nonEmptyStringArray,
-    organizer: requiredString,
-    tags: nonEmptyStringArray,
+    description: publishedString,
+    overview: publishedString,
+    image: publishedString,
+    images: {
+      type: [String],
+      validate: {
+        validator(this: unknown, items: string[]): boolean {
+          if (items.length > IMAGE_RULES.maxImages) return false;
+          return !isPublished.call(this) || items.length > 0;
+        },
+        message: `An event needs between 1 and ${IMAGE_RULES.maxImages} images`,
+      },
+    },
+    imageDisplay: { type: String, enum: IMAGE_DISPLAYS, default: "static" },
+    venue: publishedString,
+    location: publishedString,
+    date: publishedString,
+    time: publishedString,
+    endDate: { type: String, trim: true },
+    endTime: publishedString,
+    timezone: {
+      type: String,
+      trim: true,
+      default: DEFAULT_TIMEZONE,
+      validate: { validator: isValidTimezone, message: "{VALUE} is not a valid timezone" },
+    },
+    mode: { ...publishedString, lowercase: true, enum: EVENT_MODES },
+    audience: publishedString,
+    agenda: publishedStringArray,
+    organizer: publishedString,
+    tags: publishedStringArray,
+    status: { type: String, enum: EVENT_STATUSES, required: true, default: "draft" },
+    source: { type: String, enum: EVENT_SOURCES, default: "manual" },
+    importNotes: { type: [String], default: [] },
+    publishedAt: { type: Date },
+    startsAt: { type: Date },
+    endsAt: { type: Date },
+    hideAt: { type: Date },
   },
-  // bufferCommands: false makes queries issued before connectToDatabase() fail immediately instead of hanging.
+  // bufferCommands: false makes queries issued before connectDB() fail immediately instead of hanging.
   { timestamps: true, bufferCommands: false },
 );
 
 EventSchema.index({ slug: 1 }, { unique: true });
+// Every visitor list: published, still visible, closest first.
+EventSchema.index({ status: 1, hideAt: 1, startsAt: 1 });
 
 /** "AWS re:Invent 2026" -> "aws-reinvent-2026" */
 function slugify(title: string): string {
@@ -129,34 +191,64 @@ function normalizeTime(value: string): string {
   return `${pad(hours)}:${pad(minutes)}`;
 }
 
-EventSchema.pre("save", function () {
-  // Only regenerate the slug when the title changes, so existing URLs stay stable.
-  if (this.isModified("title") || !this.slug) {
-    const slug = slugify(this.title);
-    if (!slug) {
-      throw validationError("title", "Title must contain at least one letter or number", this.title);
+/** Runs a date/time normalizer, reporting failure as a ValidationError on that field. */
+function normalized(path: string, value: string, normalize: (value: string) => string): string {
+  try {
+    return normalize(value);
+  } catch (e) {
+    throw validationError(path, (e as Error).message, value);
+  }
+}
+
+// `image` always mirrors the first of `images`, so older code and emails keep working.
+EventSchema.pre("validate", function () {
+  this.image = this.images[0] ?? "";
+});
+
+EventSchema.pre("save", async function () {
+  // The slug is fixed once published: changing it would break links already shared and emailed.
+  if (this.isNew || !this.slug || (this.status === "draft" && this.isModified("title"))) {
+    const EventModel = this.constructor as Model<IEvent>;
+    const others = { _id: { $ne: this._id } };
+    const duplicate = () => validationError("title", "An event with this title already exists", this.title);
+
+    // Titles in other scripts have nothing to slugify, so they get a random readable slug.
+    const base = slugify(this.title) || `event-${randomBytes(4).toString("hex")}`;
+    const year = this.date?.slice(0, 4);
+    let slug = base;
+
+    // A yearly event can reuse its title; the same title in the same year is a real duplicate.
+    const existing = await EventModel.findOne({ slug: base, ...others }).select("date").lean();
+    if (existing) {
+      if (!year || existing.date?.slice(0, 4) === year) throw duplicate();
+      slug = `${base}-${year}`;
+      if (await EventModel.exists({ slug, ...others })) throw duplicate();
     }
+
     this.slug = slug;
   }
 
-  // Surface normalization failures as ValidationErrors on the offending path, so callers can return a 400.
-  if (this.isModified("date")) {
-    try {
-      this.date = normalizeDate(this.date);
-    } catch (e) {
-      throw validationError("date", (e as Error).message, this.date);
+  if (this.date && this.isModified("date")) this.date = normalized("date", this.date, normalizeDate);
+  if (this.time && this.isModified("time")) this.time = normalized("time", this.time, normalizeTime);
+  if (this.endDate && this.isModified("endDate")) this.endDate = normalized("endDate", this.endDate, normalizeDate);
+  if (this.endTime && this.isModified("endTime")) this.endTime = normalized("endTime", this.endTime, normalizeTime);
+
+  if (this.date && this.time) {
+    const times = computeEventTimes({
+      date: this.date,
+      time: this.time,
+      endDate: this.endDate,
+      endTime: this.endTime,
+      timezone: this.timezone,
+    });
+    if (times.endsAt && times.endsAt <= times.startsAt) {
+      throw validationError("endTime", "The event must end after it starts. For events past midnight, set an end date.", this.endTime);
     }
-  }
-  if (this.isModified("time")) {
-    try {
-      this.time = normalizeTime(this.time);
-    } catch (e) {
-      throw validationError("time", (e as Error).message, this.time);
-    }
+    this.set(times);
   }
 });
 
-// Two events with the same title produce the same slug; report that clearly instead of a raw E11000.
+// A lost race for a slug surfaces as a raw E11000; report it the same way as the check above.
 EventSchema.post("save", { errorHandler: true }, function (error, _res, next) {
   next(
     isDuplicateKeyError(error)

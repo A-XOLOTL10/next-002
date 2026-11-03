@@ -14,17 +14,13 @@ const ExploreBtn = () => {
       })
       posthog.capture("event_exploration_started")
     }
-
-    console.log("Explore button clicked")
   }
 
   return (
-    <button type="button" id="explore-btn" className="mt-7 mx-auto" onClick={handleExploreClick} >
-      <a href="#events">
-        Explore Events
-        <Image src="/icons/arrow-down.svg" alt="Arrow Down" width={24} height={24} />
-      </a>
-    </button>
+    <a href="#events" id="explore-btn" className="mt-7 mx-auto" onClick={handleExploreClick}>
+      Explore Events
+      <Image src="/icons/arrow-down.svg" alt="" width={24} height={24} className="size-6" />
+    </a>
   )
 }
 

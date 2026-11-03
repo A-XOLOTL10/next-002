@@ -17,12 +17,26 @@ export const toList = (items: string[]): string[] => {
 /** The shape the Event model's slugify() produces: lowercase words joined by single hyphens. */
 export const isValidSlug = (slug: string): boolean => slug.length <= 200 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
 
-/** Today's date as YYYY-MM-DD (UTC), the same format events store their date in. */
-export const todayISODate = (): string => new Date().toISOString().slice(0, 10)
+type Moment = Date | string | null | undefined
 
-/** True once an event's date (YYYY-MM-DD) is before today. Events stay bookable on the day itself. */
-export const isPastEvent = (date: string): boolean => date < todayISODate()
+/** True once the event has finished. Bookings close and pages show "ended" from this moment. */
+export const hasEnded = (endsAt: Moment): boolean => Boolean(endsAt) && new Date(endsAt as Date | string).getTime() <= Date.now()
+
+/** True from midnight after the event's last day: visitors no longer see it at all. */
+export const isHiddenFromVisitors = (hideAt: Moment): boolean => Boolean(hideAt) && new Date(hideAt as Date | string).getTime() <= Date.now()
+
+/** "5:00 PM GMT+1", in the event's own timezone. */
+export const formatEventTime = (moment: Date | string, timezone: string): string =>
+  new Intl.DateTimeFormat("en-US", { timeStyle: "short", timeZone: timezone }).format(new Date(moment)) +
+  " " +
+  (new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "short" })
+    .formatToParts(new Date(moment))
+    .find((part) => part.type === "timeZoneName")?.value ?? "")
 
 /** "2026-11-09" -> "Monday, 9 November 2026". Formatted in UTC so the day never shifts by timezone. */
 export const formatEventDate = (date: string): string =>
   new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`))
+
+/** "2026-11-09" -> "9 Nov 2026", for event cards. */
+export const formatShortDate = (date: string): string =>
+  new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`))

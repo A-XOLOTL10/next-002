@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getEventBySlug } from "@/lib/actions/events.actions";
 import { deleteEvent, updateEvent } from "@/lib/events.service";
 import { isAdmin } from "@/lib/auth";
-import { isValidSlug } from "@/lib/utils";
+import { isHiddenFromVisitors, isValidSlug } from "@/lib/utils";
 
 type Ctx = RouteContext<"/api/events/[slug]">;
 
@@ -31,7 +31,9 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     try {
         // The same cached read the event page uses, so both stay in sync.
         const event = await getEventBySlug(slug);
-        if (!event) return NextResponse.json({ message: `Event "${slug}" not found` }, { status: 404 });
+        if (!event || isHiddenFromVisitors(event.hideAt)) {
+            return NextResponse.json({ message: `Event "${slug}" not found` }, { status: 404 });
+        }
         return NextResponse.json({ message: "Event fetched successfully", event }, { status: 200 });
     } catch (e) {
         console.error(e);
@@ -41,8 +43,8 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 
 /**
  * PUT /api/events/[slug]: update an event (admins only). multipart/form-data with only
- * the fields to change; include an image File to replace the image. Changing the title
- * changes the slug (returned in the response).
+ * the fields to change. Image files under `images` are added; `removeImages` lists the
+ * URLs to remove. A published event keeps its slug, so existing links keep working.
  */
 export async function PUT(req: NextRequest, ctx: Ctx) {
     if (!(await isAdmin())) return unauthorized();

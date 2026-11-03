@@ -1,10 +1,12 @@
 import { cacheLife, cacheTag } from "next/cache"
 import connectDB from "@/lib/mongodb"
-import Event from "@/database/event.model"
+import Event, { type IEvent } from "@/database/event.model"
+import type { ImageDisplay } from "@/database/event.constants"
 import { toList } from "@/lib/utils"
 import { EVENTS_TAG, eventTag } from "@/lib/cache-tags"
 
-// Cached event reads, shared by pages and GET API routes.
+// Cached event reads, shared by pages and GET API routes. Visitors only ever get published
+// events: drafts stay out of every query here.
 //
 // Why "use cache" here: events are read on every page view but only change when an
 // admin creates, edits or deletes one, so each read is cached and repeat visits skip
@@ -14,78 +16,103 @@ import { EVENTS_TAG, eventTag } from "@/lib/cache-tags"
 // cacheLife("hours") is a safety net for changes made outside the app
 // (e.g. editing a document in Atlas), which don't clear any tag.
 //
+// "Has it ended?" is never cached: pages and cards work it out from endsAt and hideAt
+// at the moment they're viewed.
+//
 // Return values are plain objects with string _ids: cached values must be
 // serializable, and Mongoose ObjectIds are class instances.
 
-// Only the fields EventCard renders, with _id as a string: Client Components
-// can only receive plain, serializable props (not Mongoose ObjectIds).
+// What EventCard needs, as plain, serializable props (Client Components can't receive
+// Mongoose ObjectIds or Dates).
 export type EventCardData = {
   _id: string
   title: string
   image: string
+  images: string[]
+  imageDisplay: ImageDisplay
   slug: string
   location: string
   date: string
   time: string
+  timezone: string
+  endsAt?: string
+  hideAt?: string
 }
 
+const CARD_FIELDS = "title image images imageDisplay slug location date time timezone endsAt hideAt"
 const SIMILAR_EVENTS_LIMIT = 6
 
+type CardSource = Pick<IEvent, "title" | "image" | "images" | "imageDisplay" | "slug" | "location" | "date" | "time" | "timezone" | "endsAt" | "hideAt"> & {
+  _id: { toString(): string }
+}
+
+const toCard = (event: CardSource): EventCardData => ({
+  _id: event._id.toString(),
+  title: event.title,
+  image: event.image,
+  images: event.images,
+  imageDisplay: event.imageDisplay,
+  slug: event.slug,
+  location: event.location,
+  date: event.date,
+  time: event.time,
+  timezone: event.timezone,
+  endsAt: event.endsAt?.toISOString(),
+  hideAt: event.hideAt?.toISOString(),
+})
+
 /**
- * Every event as card data, soonest date first. Pages split it into upcoming and past
- * themselves, so this one cached list serves both and stays valid as days go by.
+ * Every event visitors can see, soonest first: the closest event is the most important.
+ * Events hidden after their end day drop out here, and pages filter again when they render.
  */
 export async function getEventCards(): Promise<EventCardData[]> {
   "use cache"
   cacheLife("hours")
-  cacheTag(EVENTS_TAG) // cleared when an event is created, edited or deleted
+  cacheTag(EVENTS_TAG) // cleared when an event is published, edited or deleted
 
   await connectDB()
-  const events = await Event.find()
-    .sort({ date: 1, time: 1 })
-    .select("title image slug location date time")
+  const events = await Event.find({ status: "published", hideAt: { $gt: new Date() } })
+    .sort({ startsAt: 1 })
+    .select(CARD_FIELDS)
     .lean()
 
-  return events.map(({ _id, title, image, slug, location, date, time }) => ({
-    _id: _id.toString(),
-    title,
-    image,
-    slug,
-    location,
-    date,
-    time,
-  }))
+  return events.map(toCard)
 }
 
-/** All events with every field, newest first (GET /api/events). */
+/** Published events with every public field, soonest first (GET /api/events). */
 export async function getAllEvents() {
   "use cache"
   cacheLife("hours")
-  cacheTag(EVENTS_TAG) // cleared when an event is created, edited or deleted
+  cacheTag(EVENTS_TAG) // cleared when an event is published, edited or deleted
 
   await connectDB()
-  const events = await Event.find().sort({ createdAt: -1 }).lean()
+  const events = await Event.find({ status: "published", hideAt: { $gt: new Date() } })
+    .sort({ startsAt: 1 })
+    .select("-importNotes -source -__v")
+    .lean()
 
   return events.map((event) => ({ ...event, _id: event._id.toString() }))
 }
 
-/** One event by slug, or null if it doesn't exist. */
+/** One published event by slug, or null. Callers decide whether it's still visible (hideAt). */
 export async function getEventBySlug(slug: string) {
   "use cache"
   cacheLife("hours")
-  // Tagged per slug: a "not found" result is cached too, so creating an event with
-  // this slug must clear it (done in POST /api/events).
+  // Tagged per slug: a "not found" result is cached too, so publishing an event with
+  // this slug must clear it (done in lib/events.service.ts).
   cacheTag(eventTag(slug))
 
   await connectDB()
-  const event = await Event.findOne({ slug: slug.toLowerCase() }).lean()
+  const event = await Event.findOne({ slug: slug.toLowerCase(), status: "published" })
+    .select("-importNotes -source -__v")
+    .lean()
   if (!event) return null
 
   return { ...event, _id: event._id.toString() }
 }
 
 /**
- * Other events sharing at least one tag with the event at `slug` ([] if none).
+ * Other events sharing at least one tag with the event at `slug`, soonest first ([] if none).
  * Throws on database errors rather than returning [], so a brief outage isn't
  * cached as "no similar events" for hours; callers decide how to degrade.
  */
@@ -99,18 +126,16 @@ export async function getSimilarEventsBySlug(slug: string): Promise<EventCardDat
   const event = await Event.findOne({ slug: slug.toLowerCase() }).select("tags").lean()
   if (!event) return []
 
-  const similar = await Event.find({ _id: { $ne: event._id }, tags: { $in: toList(event.tags) } })
-    .select("title image slug location date time")
+  const similar = await Event.find({
+    _id: { $ne: event._id },
+    status: "published",
+    hideAt: { $gt: new Date() },
+    tags: { $in: toList(event.tags) },
+  })
+    .sort({ startsAt: 1 })
+    .select(CARD_FIELDS)
     .limit(SIMILAR_EVENTS_LIMIT)
     .lean()
 
-  return similar.map(({ _id, title, image, slug, location, date, time }) => ({
-    _id: _id.toString(),
-    title,
-    image,
-    slug,
-    location,
-    date,
-    time,
-  }))
+  return similar.map(toCard)
 }

@@ -1,8 +1,10 @@
 import "server-only"
 import connectDB from "@/lib/mongodb"
-import Event, { type EventMode } from "@/database/event.model"
+import Event, { type IEvent } from "@/database/event.model"
 import Booking, { type BookingStatus } from "@/database/booking.model"
+import type { EventStatus, ImageDisplay } from "@/database/event.constants"
 import { requireAdmin } from "@/lib/auth"
+import { findMissingFields } from "@/lib/events.service"
 import { toList } from "@/lib/utils"
 
 // Admin-only reads. Each function checks the session itself, so admin data can't be
@@ -16,8 +18,12 @@ export type AdminEventSummary = {
   title: string
   date: string
   location: string
+  status: EventStatus
+  endsAt?: string
+  hideAt?: string
   confirmedCount: number
   pendingCount: number
+  checkedInCount: number
 }
 
 export type AdminBooking = {
@@ -26,70 +32,148 @@ export type AdminBooking = {
   ticketId: string
   status: BookingStatus
   bookedAt: string // ISO timestamp
+  checkedInAt?: string // ISO timestamp
 }
 
 /** Values for the edit form. Lists are already split into items. */
-export type EventFormValues = {
+export type EventFormValues = Partial<
+  Pick<
+    IEvent,
+    | "title" | "description" | "overview" | "venue" | "location" | "date" | "time" | "endDate" | "endTime"
+    | "timezone" | "mode" | "audience" | "organizer" | "agenda" | "tags" | "images"
+  >
+> & { status: EventStatus; imageDisplay: ImageDisplay }
+
+export type DraftSummary = {
+  slug: string
   title: string
-  description: string
-  overview: string
-  image: string
-  venue: string
-  location: string
-  date: string
-  time: string
-  mode: EventMode
-  audience: string
-  organizer: string
-  agenda: string[]
-  tags: string[]
+  date?: string
+  location?: string
+  image?: string
+  source: IEvent["source"]
+  importNotes: string[]
+  missing: string[] // field names stopping this draft going live
 }
 
-/** All events, newest first, with confirmed and pending booking counts. */
+/** An event as the preview needs it: every field, plain JSON, any status. */
+export type EventPreview = Omit<IEvent, "startsAt" | "endsAt" | "hideAt" | "publishedAt" | "createdAt" | "updatedAt"> & {
+  _id: string
+  endsAt?: string
+  missing: Record<string, string>
+}
+
+export type TicketCheckIn = {
+  ticketId: string
+  email: string
+  status: BookingStatus
+  checkedInAt?: string
+  event: { title: string; date: string; time: string; venue: string; location: string; timezone: string; hideAt?: string } | null
+}
+
+/** All events, newest first, with booking counts. */
 export async function getEventsWithBookingCounts(): Promise<AdminEventSummary[]> {
   await requireAdmin()
   await connectDB()
 
   const [events, counts] = await Promise.all([
-    Event.find().sort({ createdAt: -1 }).select("slug title date location").lean(),
-    Booking.aggregate<{ _id: { eventId: unknown; status: BookingStatus }; count: number }>([
-      { $group: { _id: { eventId: "$eventId", status: "$status" }, count: { $sum: 1 } } },
+    Event.find({ status: "published" }).sort({ startsAt: 1 }).select("slug title date location status endsAt hideAt").lean(),
+    Booking.aggregate<{ _id: { eventId: unknown; status: BookingStatus }; count: number; checkedIn: number }>([
+      {
+        $group: {
+          _id: { eventId: "$eventId", status: "$status" },
+          count: { $sum: 1 },
+          checkedIn: { $sum: { $cond: [{ $ifNull: ["$checkedInAt", false] }, 1, 0] } },
+        },
+      },
     ]),
   ])
 
-  const countFor = (eventId: string, status: BookingStatus) =>
-    counts.find((c) => String(c._id.eventId) === eventId && c._id.status === status)?.count ?? 0
+  const countsFor = (eventId: string, status: BookingStatus) =>
+    counts.find((c) => String(c._id.eventId) === eventId && c._id.status === status)
 
-  return events.map((event) => ({
-    slug: event.slug,
-    title: event.title,
-    date: event.date,
-    location: event.location,
-    confirmedCount: countFor(event._id.toString(), "confirmed"),
-    pendingCount: countFor(event._id.toString(), "pending"),
+  return events.map((event) => {
+    const id = event._id.toString()
+    return {
+      slug: event.slug,
+      title: event.title,
+      date: event.date,
+      location: event.location,
+      status: event.status,
+      endsAt: event.endsAt?.toISOString(),
+      hideAt: event.hideAt?.toISOString(),
+      confirmedCount: countsFor(id, "confirmed")?.count ?? 0,
+      pendingCount: countsFor(id, "pending")?.count ?? 0,
+      checkedInCount: countsFor(id, "confirmed")?.checkedIn ?? 0,
+    }
+  })
+}
+
+/** Events waiting for review, oldest first, each with what's stopping it going live. */
+export async function getDrafts(): Promise<DraftSummary[]> {
+  await requireAdmin()
+  await connectDB()
+
+  const drafts = await Event.find({ status: "draft" }).sort({ createdAt: 1 }).lean()
+
+  return drafts.map((draft) => ({
+    slug: draft.slug,
+    title: draft.title,
+    date: draft.date,
+    location: draft.location,
+    image: draft.images[0],
+    source: draft.source,
+    importNotes: draft.importNotes,
+    missing: Object.keys(findMissingFields(draft)),
   }))
+}
+
+export async function getDraftCount(): Promise<number> {
+  await requireAdmin()
+  await connectDB()
+  return Event.countDocuments({ status: "draft" })
+}
+
+/** Any event by slug for the admin preview, or null. Lists are already split into items. */
+export async function getEventPreview(slug: string): Promise<EventPreview | null> {
+  await requireAdmin()
+  await connectDB()
+
+  const event = await Event.findOne({ slug: slug.toLowerCase() })
+    .select("-startsAt -hideAt -publishedAt -createdAt -updatedAt")
+    .lean()
+  if (!event) return null
+
+  return {
+    ...event,
+    _id: event._id.toString(),
+    endsAt: event.endsAt?.toISOString(),
+    agenda: toList(event.agenda),
+    tags: toList(event.tags),
+    missing: findMissingFields(event),
+  }
 }
 
 /** One event and its bookings (oldest first), or null if the event doesn't exist. */
 export async function getEventBookings(
   slug: string,
-): Promise<{ event: { _id: string; title: string; date: string; location: string }; bookings: AdminBooking[] } | null> {
+): Promise<{ event: { _id: string; title: string; date: string; location: string; status: EventStatus }; bookings: AdminBooking[] } | null> {
   await requireAdmin()
   await connectDB()
 
-  const event = await Event.findOne({ slug: slug.toLowerCase() }).select("title date location").lean()
+  const event = await Event.findOne({ slug: slug.toLowerCase() }).select("title date location status").lean()
   if (!event) return null
 
   const bookings = await Booking.find({ eventId: event._id }).sort({ createdAt: 1 }).lean()
 
   return {
-    event: { _id: event._id.toString(), title: event.title, date: event.date, location: event.location },
+    event: { _id: event._id.toString(), title: event.title, date: event.date, location: event.location, status: event.status },
     bookings: bookings.map((b) => ({
       _id: b._id.toString(),
       email: b.email,
       ticketId: b.ticketId,
       status: b.status,
       bookedAt: b.createdAt.toISOString(),
+      checkedInAt: b.checkedInAt?.toISOString(),
     })),
   }
 }
@@ -106,16 +190,53 @@ export async function getEventForEdit(slug: string): Promise<EventFormValues | n
     title: event.title,
     description: event.description,
     overview: event.overview,
-    image: event.image,
+    images: event.images,
+    imageDisplay: event.imageDisplay,
     venue: event.venue,
     location: event.location,
     date: event.date,
     time: event.time,
+    endDate: event.endDate,
+    endTime: event.endTime,
+    timezone: event.timezone,
     mode: event.mode,
     audience: event.audience,
     organizer: event.organizer,
+    status: event.status,
     // Older events stored lists as one JSON string; toList unpacks them.
     agenda: toList(event.agenda),
     tags: toList(event.tags),
+  }
+}
+
+/** Accepts a ticket ID or a whole scanned check-in link. */
+export const parseTicketInput = async (input: string): Promise<string> =>
+  (input.match(/ticket=([\w%-]+)/)?.[1] ?? input).trim().toUpperCase()
+
+/** What door staff see for a scanned ticket, or null if there's no such ticket. */
+export async function getTicketForCheckIn(input: string): Promise<TicketCheckIn | null> {
+  await requireAdmin()
+  await connectDB()
+
+  const ticketId = await parseTicketInput(input)
+  const booking = await Booking.findOne({ ticketId }).lean()
+  if (!booking) return null
+
+  const event = await Event.findById(booking.eventId).select("title date time venue location timezone hideAt").lean()
+
+  return {
+    ticketId: booking.ticketId,
+    email: booking.email,
+    status: booking.status,
+    checkedInAt: booking.checkedInAt?.toISOString(),
+    event: event && {
+      title: event.title,
+      date: event.date,
+      time: event.time,
+      venue: event.venue,
+      location: event.location,
+      timezone: event.timezone,
+      hideAt: event.hideAt?.toISOString(),
+    },
   }
 }

@@ -23,6 +23,13 @@ const BookEvents = ({ eventId }: { eventId: string }) => {
           Can&apos;t find it? Check your <strong>spam or junk folder</strong>. The link expires in 24 hours. To get a new
           link, just book again with the same email.
         </p>
+        {/* Only in development without SMTP: no email was sent, so link straight to the step. */}
+        {state.devConfirmUrl && (
+          <p className="text-sm">
+            <strong>Testing without email:</strong>{" "}
+            <a href={state.devConfirmUrl} className="underline">open your confirmation link</a>
+          </p>
+        )}
       </div>
     )
   }

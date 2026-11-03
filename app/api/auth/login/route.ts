@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAdminCredentials, createSession } from "@/lib/auth";
+import { signInAdmin } from "@/lib/auth";
 
 /**
  * POST /api/auth/login: admin sign-in for API clients such as Postman.
@@ -26,14 +26,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: "email and password are required" }, { status: 400 });
     }
 
-    try {
-        if (!checkAdminCredentials(email, password)) {
+    switch (await signInAdmin(email, password)) {
+        case "ok":
+            return NextResponse.json({ message: "Signed in" }, { status: 200 });
+        case "invalid":
             return NextResponse.json({ message: "Invalid email or password" }, { status: 401 });
-        }
-        await createSession();
-        return NextResponse.json({ message: "Signed in" }, { status: 200 });
-    } catch (e) {
-        console.error("Admin API login failed:", e);
-        return NextResponse.json({ message: "Admin login isn't configured on the server" }, { status: 500 });
+        case "locked":
+            return NextResponse.json({ message: "Too many failed attempts. Try again in 15 minutes." }, { status: 429 });
+        case "unconfigured":
+            return NextResponse.json({ message: "Admin login isn't configured on the server" }, { status: 500 });
     }
 }
