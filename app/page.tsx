@@ -1,33 +1,16 @@
-// Why "use cache" on the whole page: it uses no request-time data (no params,
-// cookies or search params), so the full page, events included, can be
-// prerendered and served from cache instead of querying MongoDB on every visit.
-// (proxy.ts runs before the cache, so the first-visit redirect to the login page
-// doesn't stop this page being static.)
-"use cache"
-
+import { Suspense } from "react"
 import Link from "next/link"
-import { cacheLife, cacheTag } from "next/cache"
+import { connection } from "next/server"
 import ExploreBtn from "@/components/ExploreBtn"
 import EventList, { visibleEvents } from "@/components/EventList"
-import { events as bundledEvents } from "@/lib/constants"
 import { getEventCards } from "@/lib/actions/events.actions"
-import { EVENTS_TAG } from "@/lib/cache-tags"
 
 const FEATURED_LIMIT = 6
 
-const page = async () => {
-  // A short lifetime keeps the order right as events pass. Between rebuilds, each event card
-  // works out "ended" and "hidden" for itself in the browser.
-  cacheLife("minutes")
-  // Tagged so publishing, editing or deleting an event refreshes the homepage right away.
-  cacheTag(EVENTS_TAG)
-
-  // Reads MongoDB directly instead of fetching our own /api/events: at build time
-  // no server is running to answer that request, so a cached self-fetch can hang.
-  // Without a database configured (e.g. CI builds), show the bundled sample events.
-  // Database errors propagate to app/error.tsx (and are never cached).
-  const events = process.env.MONGODB_URI ? await getEventCards() : bundledEvents
-
+// The heading is prerendered at build time; the events list reads MongoDB, so it renders
+// at request time behind <Suspense>. The build never connects to the database (it may
+// not be reachable from the build machine at all).
+const page = () => {
   return (
     <section>
       <h1 className="text-center">The Hub for Every Developers <br /> Event You Must Attend</h1>
@@ -41,12 +24,26 @@ const page = async () => {
           <Link href="/events" className="text-sm hover:underline">See all events &rarr;</Link>
         </div>
 
-        <EventList
-          events={visibleEvents(events).slice(0, FEATURED_LIMIT)}
-          emptyText="No upcoming events right now. Check back soon!"
-        />
+        <Suspense fallback={<p className="text-light-200">Loading events...</p>}>
+          <FeaturedEvents />
+        </Suspense>
       </div>
     </section>
+  )
+}
+
+async function FeaturedEvents() {
+  // Request time only. The read itself is still cached (see getEventCards), so most visits
+  // skip MongoDB, and publishing, editing or deleting an event clears it.
+  // Database errors propagate to app/error.tsx (and are never cached).
+  await connection()
+  const events = await getEventCards()
+
+  return (
+    <EventList
+      events={visibleEvents(events).slice(0, FEATURED_LIMIT)}
+      emptyText="No upcoming events right now. Check back soon!"
+    />
   )
 }
 
