@@ -6,7 +6,7 @@ import { revalidateTag } from "next/cache"
 import connectDB from "@/lib/mongodb"
 import Booking from "@/database/booking.model"
 import Event from "@/database/event.model"
-import { getBaseUrl } from "@/lib/base-url"
+import { baseUrlIsConfigured, getBaseUrl } from "@/lib/base-url"
 import { bookingsTag } from "@/lib/cache-tags"
 import { emailIsConfigured, sendBookingConfirmation, sendBookingVerification, type EmailEvent } from "@/lib/email"
 import { LIMITS, clientIp, consumeAttempt } from "@/lib/rate-limit"
@@ -79,6 +79,10 @@ export async function createBooking(
     console.error("Booking refused: SMTP isn't configured, so no confirmation email can be sent.")
     return failed("Bookings are temporarily unavailable. Please try again later.")
   }
+  if (!baseUrlIsConfigured()) {
+    console.error("Booking refused: NEXT_PUBLIC_BASE_URL isn't set, so the email link can't be built safely.")
+    return failed("Bookings are temporarily unavailable. Please try again later.")
+  }
 
   if (!(await consumeAttempt(`booking-ip:${await clientIp()}`, LIMITS.bookingPerIp))) {
     return failed("Too many booking attempts. Please try again later.")
@@ -147,8 +151,12 @@ export async function createBooking(
     await sendBookingVerification({ to: email, confirmUrl, event })
   } catch (e) {
     console.error(`Confirmation email failed for ${email}:`, e)
-    // Don't leave a booking behind that nobody can ever confirm.
-    if (createdNew) await Booking.deleteOne({ eventId, email }).catch(() => undefined)
+    // Don't leave a booking behind that nobody can ever confirm. Matched on this attempt's token,
+    // so a newer request for the same address (maybe already confirmed) is never deleted.
+    if (createdNew) {
+      await Booking.deleteOne({ eventId, email, status: "pending", verificationTokenHash: verification.verificationTokenHash })
+        .catch(() => undefined)
+    }
     return failed("We couldn't send your confirmation email. Check the address and try again.")
   }
 
@@ -162,6 +170,11 @@ export async function confirmBooking(token: string): Promise<ConfirmState> {
     message: "This confirmation link is invalid, has expired, or was already used. If you already confirmed, check your inbox for your ticket; otherwise, book again from the event page.",
   }
   if (typeof token !== "string" || token.length < 20 || token.length > 100) return invalid
+  // The ticket's QR code needs the site address: check before the link is used up.
+  if (!baseUrlIsConfigured()) {
+    console.error("Confirmation refused: NEXT_PUBLIC_BASE_URL isn't set.")
+    return { status: "error", message: "We couldn't confirm your booking right now. Please try the link again later." }
+  }
 
   let ticketId: string
   let email: string

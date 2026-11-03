@@ -23,6 +23,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/events/[slu
     const check = await verifyPublishPin(pin);
     if (check === "wrong") return NextResponse.json({ message: "Incorrect PIN" }, { status: 403 });
     if (check === "locked") return NextResponse.json({ message: "Too many wrong PINs. Try again in 15 minutes." }, { status: 429 });
+    if (check === "unconfigured") return NextResponse.json({ message: "Publishing isn't configured on the server" }, { status: 503 });
 
     const result = await publishEvents([slug]);
     if (!result.ok) return NextResponse.json({ message: result.message }, { status: result.status });

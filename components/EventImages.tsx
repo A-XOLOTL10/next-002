@@ -38,6 +38,8 @@ const EventImages = ({ images, display, title, controls = false, sizes, preload 
   }
 
   const shown = isSlider ? images : images.slice(0, 1)
+  // `active` can be left over from the slider (e.g. the card turned static when the event ended).
+  const current = isSlider ? active % images.length : 0
   const move = (step: number) => setActive((current) => (current + step + images.length) % images.length)
 
   return (
@@ -54,7 +56,7 @@ const EventImages = ({ images, display, title, controls = false, sizes, preload 
           fill
           sizes={sizes}
           preload={preload && index === 0}
-          className={`object-cover transition-opacity duration-700 ${index === active ? "opacity-100" : "opacity-0"}`}
+          className={`object-cover transition-opacity duration-700 ${index === current ? "opacity-100" : "opacity-0"}`}
         />
       ))}
 
@@ -68,9 +70,9 @@ const EventImages = ({ images, display, title, controls = false, sizes, preload 
                 key={src}
                 type="button"
                 aria-label={`Show design ${index + 1}`}
-                aria-current={index === active}
+                aria-current={index === current}
                 onClick={() => setActive(index)}
-                className={`size-2.5 cursor-pointer rounded-full ${index === active ? "bg-primary" : "bg-white/50"}`}
+                className={`size-2.5 cursor-pointer rounded-full ${index === current ? "bg-primary" : "bg-white/50"}`}
               />
             ))}
           </div>

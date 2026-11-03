@@ -36,8 +36,9 @@ const EventAgenda = ({ agendaItems }: { agendaItems: string[] }) => (
   <div className="agenda">
     <h2>Event Agenda</h2>
     <ul>
-      {agendaItems.map((item) => (
-        <li key={item}>{item}</li>
+      {/* Items can repeat (two "Coffee break"s), so the position keeps keys unique. */}
+      {agendaItems.map((item, index) => (
+        <li key={`${index}-${item}`}>{item}</li>
       ))}
     </ul>
   </div>

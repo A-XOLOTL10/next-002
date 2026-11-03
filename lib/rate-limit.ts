@@ -11,14 +11,24 @@ const MINUTE = 60 * 1000
 /** How many attempts each action gets in its window. */
 export const LIMITS = {
   login: { attempts: 5, windowMs: 15 * MINUTE }, // guessing the admin password
+  // All addresses together: a hard cap even if an attacker keeps changing (or faking) their address.
+  loginAll: { attempts: 50, windowMs: 15 * MINUTE },
   publishPin: { attempts: 5, windowMs: 15 * MINUTE }, // guessing the publish PIN
   bookingPerIp: { attempts: 20, windowMs: 60 * MINUTE }, // bots filling in the booking form
   bookingEmail: { attempts: 3, windowMs: 60 * MINUTE }, // flooding someone's inbox with links
   aiImport: { attempts: 10, windowMs: 60 * MINUTE }, // runaway AI costs
 } as const
 
-/** Counts one attempt. Returns false once `key` has used up its attempts for this window. */
-export async function consumeAttempt(key: string, { attempts, windowMs }: { attempts: number; windowMs: number }): Promise<boolean> {
+/**
+ * Counts one attempt. Returns false once `key` has used up its attempts for this window.
+ * Call it *before* checking a password or PIN: the count is atomic, so parallel guesses
+ * can't all slip under the limit. `failClosed` refuses when the counter can't be reached.
+ */
+export async function consumeAttempt(
+  key: string,
+  { attempts, windowMs }: { attempts: number; windowMs: number },
+  { failClosed = false } = {},
+): Promise<boolean> {
   const now = new Date()
 
   const increment = () =>
@@ -48,29 +58,29 @@ export async function consumeAttempt(key: string, { attempts, windowMs }: { atte
     }
     return (record?.count ?? 1) <= attempts
   } catch (e) {
-    // If the limiter's own storage is down, don't lock everyone out of the site.
+    // If the limiter's own storage is down, public forms keep working; secrets stay guarded.
     console.error("Rate limit check failed:", e)
-    return true
+    return !failClosed
+  }
+}
+
+/** Forgets `key`'s attempts, e.g. after a correct password, so they don't count against it. */
+export async function clearAttempts(...keys: string[]): Promise<void> {
+  try {
+    await connectDB()
+    await RateLimit.deleteMany({ key: { $in: keys } })
+  } catch (e) {
+    console.error("Rate limit reset failed:", e)
   }
 }
 
 /**
- * True once `key` has used up its attempts. Read-only, so an action can count only its
- * failures: a correct password or PIN should never use up an attempt.
+ * Best guess at the visitor's address, for per-visitor limits. Uses the *last* x-forwarded-for
+ * entry: that's the one our own proxy added (Vercel replaces the header entirely), while earlier
+ * entries are whatever the client sent. Without a proxy in front, every header here can be
+ * faked, which is why login also has an overall limit (LIMITS.loginAll).
  */
-export async function isLockedOut(key: string, { attempts }: { attempts: number }): Promise<boolean> {
-  try {
-    await connectDB()
-    const record = await RateLimit.findOne({ key, expiresAt: { $gt: new Date() } }).lean()
-    return (record?.count ?? 0) >= attempts
-  } catch (e) {
-    console.error("Rate limit check failed:", e)
-    return false
-  }
-}
-
-/** Best guess at the visitor's address, for per-visitor limits. */
 export async function clientIp(): Promise<string> {
   const h = await headers()
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown"
+  return h.get("x-forwarded-for")?.split(",").at(-1)?.trim() || h.get("x-real-ip") || "unknown"
 }
