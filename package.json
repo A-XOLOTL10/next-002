@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.18.0 <23"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -20,10 +20,11 @@
     "cloudinary": "^2.11.0",
     "cn": "^0.4.0",
     "dot-env": "^0.0.1",
+    "git": "^0.1.5",
     "lucide-react": "^1.57.0",
     "mongodb": "^7.7.0",
     "mongoose": "^9.11.3",
-    "next": "16.4.4",
+    "next": "16.4.0",
     "nodemailer": "^10.2.1",
     "ogl": "^1.0.11",
     "posthog-js": "^1.438.12",
@@ -42,7 +43,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.4",
+    "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
