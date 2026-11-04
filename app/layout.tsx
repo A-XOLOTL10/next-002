@@ -4,6 +4,11 @@ import "./globals.css";
 import LightRays from '@/components/LightRays';
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
+import Link from "next/link";
+
+// A fixed year, not new Date(): reading the clock while prerendering is a build error with
+// Cache Components, and the year in a footer doesn't need to be live.
+const COPYRIGHT_YEAR = 2026;
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -54,6 +59,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main>
           {children}
         </main>
+
+        {/* Google, GitHub and LinkedIn sign-in reviews check that every page links to these. */}
+        <footer className="text-light-200 mt-auto flex flex-wrap justify-center gap-6 py-8 text-sm">
+          <span>&copy; {COPYRIGHT_YEAR} DevEvent</span>
+          <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+          <Link href="/terms" className="hover:underline">Terms and Conditions</Link>
+        </footer>
 
       </body>
     </html>

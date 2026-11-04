@@ -2,7 +2,13 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+First, create a `.env.local` file in the project root with your MongoDB connection string. The home and events pages read events from MongoDB, so they show an error page without it:
+
+```bash
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/
+```
+
+Then run the development server:
 
 ```bash
 npm run dev
