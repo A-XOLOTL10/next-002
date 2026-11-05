@@ -13,6 +13,7 @@ import { issueToken } from "@/lib/accounts"
 import { decryptString, encryptString, newBackupCodes, newTotpSecret, normalizeBackupCode, sha256, totpUri, verifyTotp } from "@/lib/crypto"
 import { emailIsConfigured, sendAdminInvite, sendQuietly } from "@/lib/email"
 import { logAction } from "@/lib/audit"
+import { siteUrl as configuredSiteUrl } from "@/lib/site-url"
 
 // Admin Server Actions behind the confirmation dialogs (components/admin/ConfirmAction.tsx).
 // Each re-checks the role (they're public endpoints), and the services they call make the
@@ -71,7 +72,7 @@ export async function cancelEventAsAdminAction(slug: string, _prev: ConsoleState
 // ---------------------------------------------------------------- team (super admin only)
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const siteUrl = (): string => (process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const siteUrl = (): string => configuredSiteUrl() || "http://localhost:3000"
 
 /** Adds a supra admin and emails them an invite to set their password (48 hours). */
 export async function inviteAdminAction(_prev: ConsoleState, formData: FormData): Promise<ConsoleState> {

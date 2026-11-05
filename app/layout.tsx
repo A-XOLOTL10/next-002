@@ -26,6 +26,9 @@ const martianMono = Martian_Mono({
 export const metadata: Metadata = {
   title: "DevEvents",
   description: "The Hub for Every Developers Event You Must Attend",
+  // Google Search Console ownership check (needed for Google sign-in brand verification):
+  // paste the code from the "HTML tag" method into GOOGLE_SITE_VERIFICATION and redeploy.
+  verification: process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : undefined,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

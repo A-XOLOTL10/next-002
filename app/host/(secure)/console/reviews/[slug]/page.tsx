@@ -6,7 +6,7 @@ import EventView from "@/components/EventView"
 import { requireAdmin } from "@/lib/auth"
 import { getHostEventForReview } from "@/lib/host-events.service"
 import { cancelEventAsAdminAction, decideEventAction, decideRevisionAction } from "@/lib/actions/console.actions"
-import { AUDIENCE_AGE_LABELS, EVENT_STATUS_LABELS } from "@/database/event.constants"
+import { AUDIENCE_AGE_LABELS, EVENT_CATEGORY_LABELS, EVENT_STATUS_LABELS } from "@/database/event.constants"
 
 export const instant = false // a missing event is a real 404, decided before the response starts
 
@@ -53,6 +53,7 @@ export default async function EventReviewPage({ params }: PageProps<"/host/conso
         <div className="bg-dark-100 border-dark-200 flex flex-col gap-1 rounded-[10px] border p-4 text-sm">
           <h2 className="mb-1 text-base font-semibold">Contact and safety</h2>
           <p>Event contact: {event.hostContact ? `${event.hostContact.name} · ${event.hostContact.phone} · ${event.hostContact.email}` : <span className="text-red-400">missing</span>}</p>
+          <p>Category: {event.category ? EVENT_CATEGORY_LABELS[event.category] : <span className="text-red-400">not set</span>}</p>
           <p>Audience: {event.audienceAge ? AUDIENCE_AGE_LABELS[event.audienceAge] : <span className="text-red-400">not set</span>}</p>
           {event.audienceAge && event.audienceAge !== "adults" && (
             <p className="text-amber-400">Under-18s may attend. Safeguarding contact: {event.safeguardingContact ? `${event.safeguardingContact.name} · ${event.safeguardingContact.phone}` : "missing"}. Confirm the venue is public.</p>

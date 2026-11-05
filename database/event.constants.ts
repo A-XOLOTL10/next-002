@@ -42,6 +42,28 @@ export const AUDIENCE_AGE_LABELS: Record<AudienceAge, string> = {
 export const EVENT_SOURCES = ["manual", "ai-import"] as const
 export type EventSource = (typeof EVENT_SOURCES)[number]
 
+/**
+ * What kind of event it is. Hosts must choose one; it decides the design brief every AI image
+ * for the event follows (lib/design-categories.ts), so designs stay consistent per category.
+ */
+export const EVENT_CATEGORIES = [
+  "hackathon", "conference", "meetup", "workshop", "webinar", "bootcamp", "career", "launch", "corporate", "community",
+] as const
+export type EventCategory = (typeof EVENT_CATEGORIES)[number]
+
+export const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {
+  hackathon: "Hackathon",
+  conference: "Conference or summit",
+  meetup: "Meetup",
+  workshop: "Workshop (hands-on)",
+  webinar: "Webinar or online talk",
+  bootcamp: "Bootcamp or training course",
+  career: "Career fair or recruiting",
+  launch: "Product launch, demo day or pitch",
+  corporate: "Corporate event (offsite, partner day)",
+  community: "Community, student or youth tech",
+}
+
 /** "static" shows the first image; "slider" rotates through all of them. */
 export const IMAGE_DISPLAYS = ["static", "slider"] as const
 export type ImageDisplay = (typeof IMAGE_DISPLAYS)[number]

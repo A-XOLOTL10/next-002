@@ -11,6 +11,7 @@ import { completeSignIn, signOutEverywhere, type SignInResult } from "@/lib/auth
 import { emailIsConfigured, sendEmailVerification, sendPasswordReset, sendQuietly, sendSignupExistingAccount } from "@/lib/email"
 import { LIMITS, clientIp, consumeAttempt } from "@/lib/rate-limit"
 import { logAction } from "@/lib/audit"
+import { siteUrl as configuredSiteUrl } from "@/lib/site-url"
 import type { OAuthProfile } from "@/lib/oauth"
 
 // Account life cycle outside the sign-in form itself: Google/GitHub sign-in, email sign-up and
@@ -25,7 +26,7 @@ const TOKEN_LIFETIME: Record<Exclude<TokenPurpose, "login_challenge">, number> =
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const siteUrl = (): string => (process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const siteUrl = (): string => configuredSiteUrl() || "http://localhost:3000"
 
 /** Creates a link token for `userId` (replacing older ones for the same purpose) and returns the raw token. */
 export async function issueToken(userId: Types.ObjectId | string, purpose: Exclude<TokenPurpose, "login_challenge">): Promise<string> {

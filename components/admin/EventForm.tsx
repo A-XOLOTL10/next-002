@@ -4,7 +4,7 @@ import { startTransition, useActionState, type FormEvent, type ReactNode } from 
 import Image from "next/image"
 import type { EventFormState } from "@/lib/actions/admin.actions"
 import type { EventFormValues } from "@/lib/admin-data"
-import { DEFAULT_TIMEZONE, EVENT_MODES, IMAGE_RULES } from "@/database/event.constants"
+import { DEFAULT_TIMEZONE, EVENT_CATEGORIES, EVENT_CATEGORY_LABELS, EVENT_MODES, IMAGE_RULES } from "@/database/event.constants"
 import { cloudinaryLoader, isCloudinaryUrl } from "@/lib/image-loader"
 
 type Props = {
@@ -123,6 +123,15 @@ const EventForm = ({ action, initial, submitLabel, children, actions, relaxed = 
           <datalist id="timezones">
             {COMMON_TIMEZONES.map((zone) => <option key={zone} value={zone} />)}
           </datalist>
+        </Field>
+        <Field label="Category" name="category" error={fieldError("category")}>
+          {/* Also picks the design brief AI images follow (lib/design-categories.ts). */}
+          <select id="category" name="category" defaultValue={initial?.category ?? ""} className="admin-input">
+            <option value="">Choose a category</option>
+            {EVENT_CATEGORIES.map((category) => (
+              <option key={category} value={category}>{EVENT_CATEGORY_LABELS[category]}</option>
+            ))}
+          </select>
         </Field>
         <Field label="Mode" name="mode" error={fieldError("mode")}>
           <select id="mode" name="mode" required={required} defaultValue={initial?.mode ?? ""} className="admin-input">

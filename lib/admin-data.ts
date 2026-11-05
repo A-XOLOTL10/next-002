@@ -41,7 +41,7 @@ export type EventFormValues = Partial<
   Pick<
     IEvent,
     | "title" | "description" | "overview" | "venue" | "location" | "date" | "time" | "endDate" | "endTime"
-    | "timezone" | "mode" | "audience" | "organizer" | "agenda" | "tags" | "images"
+    | "timezone" | "mode" | "category" | "audience" | "organizer" | "agenda" | "tags" | "images"
   >
 > & { status: EventStatus; imageDisplay: ImageDisplay }
 
@@ -202,6 +202,7 @@ export async function getEventForEdit(slug: string): Promise<EventFormValues | n
     endTime: event.endTime,
     timezone: event.timezone,
     mode: event.mode,
+    category: event.category,
     audience: event.audience,
     organizer: event.organizer,
     status: event.status,

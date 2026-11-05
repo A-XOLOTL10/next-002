@@ -3,6 +3,8 @@ import mongoose, { Schema, model, models, mongo, type Model, type Types } from "
 import {
   AUDIENCE_AGES,
   type AudienceAge,
+  EVENT_CATEGORIES,
+  type EventCategory,
   DEFAULT_TIMEZONE,
   EVENT_MODES,
   EVENT_SOURCES,
@@ -34,6 +36,8 @@ export interface IEvent {
   endTime: string; // finish, 24-hour HH:mm
   timezone: string; // IANA, e.g. Africa/Lagos
   mode: EventMode;
+  /** The kind of event; also picks the design brief for AI images (lib/design-categories.ts). */
+  category?: EventCategory;
   audience: string;
   agenda: string[];
   organizer: string;
@@ -139,6 +143,8 @@ const EventSchema = new Schema<IEvent>(
       validate: { validator: isValidTimezone, message: "{VALUE} is not a valid timezone" },
     },
     mode: { ...publishedString, lowercase: true, enum: EVENT_MODES },
+    // Optional for older and admin-created events; required when a host sends an event for review.
+    category: { type: String, enum: EVENT_CATEGORIES },
     audience: publishedString,
     agenda: publishedStringArray,
     organizer: publishedString,

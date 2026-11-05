@@ -2,6 +2,7 @@ import "server-only"
 import nodemailer, { type Transporter } from "nodemailer"
 import type { SendMailOptions } from "nodemailer"
 import { formatEventDate } from "@/lib/utils"
+import { siteUrl as configuredSiteUrl } from "@/lib/site-url"
 
 // Every email DevEvent sends, built on one branded layout (renderEmail below) so they all look
 // alike and work in Gmail, Outlook and Apple Mail: table layout, inline styles, no web fonts,
@@ -57,7 +58,7 @@ export const escapeHtml = (value: string): string =>
 
 const sender = (): string | undefined => (isSet(process.env.EMAIL_FROM) ? process.env.EMAIL_FROM : process.env.SMTP_USER)
 
-const siteUrl = (): string => (process.env.NEXT_PUBLIC_BASE_URL ?? "").replace(/\/$/, "")
+const siteUrl = (): string => configuredSiteUrl()
 
 /** "Saturday, 28 November 2026 at 17:00 (Africa/Lagos)" */
 const describeWhen = (event: EmailEvent): string => `${formatEventDate(event.date)} at ${event.time} (${event.timezone})`
