@@ -6,6 +6,7 @@ import Booking from "@/database/booking.model"
 import BookEvents from "@/components/BookEvents"
 import EventList from "@/components/EventList"
 import EventView from "@/components/EventView"
+import ReportEventButton from "@/components/ReportEventButton"
 import { getEventBySlug, getSimilarEventsBySlug } from "@/lib/actions/events.actions"
 import { hasEnded, isHiddenFromVisitors } from "@/lib/utils"
 import { bookingsTag } from "@/lib/cache-tags"
@@ -78,6 +79,14 @@ export default async function EventDetailsPage({ params }: PageProps<"/events/[s
                 <BookEvents eventId={event._id} />
               </>
             )}
+
+            {/* Only sponsors our team confirmed by contacting them are listed. */}
+            {event.sponsors.length > 0 && (
+              <p className="text-light-200 text-xs">
+                <span className="text-primary">&#10003; Verified</span> with {event.sponsors.map((s) => s.name).join(", ")}
+              </p>
+            )}
+            <ReportEventButton slug={event.slug} />
           </div>
         }
       >

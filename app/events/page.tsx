@@ -1,8 +1,9 @@
 import { Suspense } from "react"
 import type { Metadata } from "next"
 import { connection } from "next/server"
-import EventList, { visibleEvents } from "@/components/EventList"
+import EventList, { EventListSkeleton, visibleEvents } from "@/components/EventList"
 import { getEventCards } from "@/lib/actions/events.actions"
+import LiveRefresh from "@/components/LiveRefresh"
 
 export const metadata: Metadata = {
   title: "All Events | DevEvent",
@@ -18,7 +19,7 @@ export default function EventsPage() {
         <p className="text-light-100">Free developer events, soonest first. Pick one and book your spot with just your email.</p>
       </div>
 
-      <Suspense fallback={<p className="text-light-200">Loading events...</p>}>
+      <Suspense fallback={<EventListSkeleton />}>
         <AllEvents />
       </Suspense>
     </section>
@@ -30,5 +31,10 @@ async function AllEvents() {
   await connection()
   const events = await getEventCards()
 
-  return <EventList events={visibleEvents(events)} emptyText="No upcoming events right now. Check back soon!" />
+  return (
+    <>
+      <EventList events={visibleEvents(events)} emptyText="No upcoming events right now. Check back soon!" />
+      <LiveRefresh />
+    </>
+  )
 }

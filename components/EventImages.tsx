@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import type { ImageDisplay } from "@/database/event.constants"
+import { cloudinaryLoader, isCloudinaryUrl } from "@/lib/image-loader"
 
 const SLIDE_MS = 5000
 
@@ -37,9 +38,12 @@ const EventImages = ({ images, display, title, controls = false, sizes, preload 
     return <div className="bg-dark-200 text-light-200 flex-center absolute inset-0 text-sm">No image yet</div>
   }
 
-  const shown = isSlider ? images : images.slice(0, 1)
   // `active` can be left over from the slider (e.g. the card turned static when the event ended).
   const current = isSlider ? active % images.length : 0
+  // Only the showing design and the next one are rendered (and so downloaded). Every design used
+  // to load at once, though visitors usually move on before the slider reaches the third.
+  const next = (current + 1) % images.length
+  const shown = isSlider ? images.map((src, index) => (index === current || index === next ? src : null)) : images.slice(0, 1)
   const move = (step: number) => setActive((current) => (current + step + images.length) % images.length)
 
   return (
@@ -48,10 +52,11 @@ const EventImages = ({ images, display, title, controls = false, sizes, preload 
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {shown.map((src, index) => (
+      {shown.map((src, index) => src && (
         <Image
           key={src}
           src={src}
+          loader={isCloudinaryUrl(src) ? cloudinaryLoader : undefined}
           alt={index === 0 ? title : `${title}, design ${index + 1}`}
           fill
           sizes={sizes}

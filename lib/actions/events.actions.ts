@@ -39,6 +39,10 @@ export type EventCardData = {
   hideAt?: string
 }
 
+// Never sent to visitors or the public API: internal notes and everything a host gave only to our team
+// (their contact, the safeguarding contact, the signed letter, review notes, who owns the event).
+const PUBLIC_EXCLUDE = "-importNotes -source -__v -ownerId -hostContact -safeguardingContact -authorizationLetterId -review -approvedSnapshotHash -cancelReason"
+
 const CARD_FIELDS = "title image images imageDisplay slug location date time timezone endsAt hideAt"
 const SIMILAR_EVENTS_LIMIT = 6
 
@@ -88,10 +92,18 @@ export async function getAllEvents() {
   await connectDB()
   const events = await Event.find({ status: "published", hideAt: { $gt: new Date() } })
     .sort({ startsAt: 1 })
-    .select("-importNotes -source -__v")
+    .select(PUBLIC_EXCLUDE)
     .lean()
 
-  return events.map((event) => ({ ...event, _id: event._id.toString() }))
+  return events.map(toPublicEvent)
+}
+
+/**
+ * Plain, public JSON: string _id, and sponsors reduced to the names our team confirmed (their ids
+ * are internal, and cached values can't hold ObjectId instances).
+ */
+function toPublicEvent<T extends { _id: { toString(): string }; sponsors?: { name: string; confirmed: boolean }[] }>(event: T) {
+  return { ...event, _id: event._id.toString(), sponsors: (event.sponsors ?? []).filter((s) => s.confirmed).map((s) => ({ name: s.name })) }
 }
 
 /** One published event by slug, or null. Callers decide whether it's still visible (hideAt). */
@@ -104,11 +116,11 @@ export async function getEventBySlug(slug: string) {
 
   await connectDB()
   const event = await Event.findOne({ slug: slug.toLowerCase(), status: "published" })
-    .select("-importNotes -source -__v")
+    .select(PUBLIC_EXCLUDE)
     .lean()
   if (!event) return null
 
-  return { ...event, _id: event._id.toString() }
+  return toPublicEvent(event)
 }
 
 /**

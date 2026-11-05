@@ -1,21 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { ADMIN_SESSION_COOKIE, VISITOR_COOKIE } from "@/lib/session-cookies"
+import { PUBLIC_HOST_PATHS, SESSION_COOKIE } from "@/lib/session-cookies"
 
-// Entry gate for the home page only. Someone arriving at "/" for the first time is sent
-// to the login page, where admins sign in and everyone else picks "Continue as visitor".
-// After either choice they have a cookie, so "/" opens normally.
+// First gate for the host area, run before any page is rendered or sent.
 //
-// This is a convenience redirect, not security: it only checks that a cookie exists.
-// Admin pages, admin actions and admin API routes each verify the signed session
-// themselves (lib/auth.ts). Event pages (/events/...) aren't gated, so shared links
-// and links in emails always work.
+// Someone without a session cookie who opens a protected /host page is redirected to the
+// sign-in page here, so not even the page's outline reaches their browser (this is what stops
+// the dashboard flashing up before the login page). The cookie is only checked for presence:
+// the real check (is the session valid, is the account active, which role) happens on the page
+// itself (lib/auth.ts), behind a "Checking your session..." loader.
+//
+// Everything outside /host (home, events, bookings) is public and never passes through here.
 export function proxy(request: NextRequest) {
-  const hasChosen = request.cookies.has(ADMIN_SESSION_COOKIE) || request.cookies.has(VISITOR_COOKIE)
-  if (hasChosen) return NextResponse.next()
+  const { pathname, search } = request.nextUrl
+  const isPublic = PUBLIC_HOST_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  if (isPublic || request.cookies.has(SESSION_COOKIE)) return NextResponse.next()
 
-  return NextResponse.redirect(new URL("/admin/login", request.url))
+  const login = new URL("/host/login", request.url)
+  // Come back here after signing in (only /host paths are honoured; see landingFor in lib/auth.ts).
+  if (pathname !== "/host") login.searchParams.set("next", `${pathname}${search}`)
+  return NextResponse.redirect(login)
 }
 
 export const config = {
-  matcher: "/",
+  matcher: ["/host", "/host/:path*"],
 }

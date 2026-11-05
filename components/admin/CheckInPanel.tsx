@@ -33,7 +33,7 @@ const CheckInPanel = ({ ticketId }: { ticketId: string }) => {
       )}
 
       {result ? (
-        <Link href="/admin/check-in" className="admin-button text-center">Scan the next ticket</Link>
+        <Link href="/host/check-in" className="admin-button text-center">Scan the next ticket</Link>
       ) : (
         <button type="button" onClick={handleCheckIn} disabled={pending} className="admin-button text-lg">
           {pending ? "Checking in..." : "Admit this ticket"}

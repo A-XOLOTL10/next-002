@@ -7,10 +7,10 @@ export const metadata: Metadata = {
   description: "The rules for booking and hosting events on DevEvent.",
 }
 
-// Static page, linked from the footer and from the Google, GitHub and LinkedIn sign-in screens.
+// Static page, linked from the footer and from the Google and GitHub sign-in screens.
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms and Conditions" updated="4 November 2026">
+    <LegalPage title="Terms and Conditions" updated="5 November 2026">
       <p>
         These terms apply to everyone who uses DevEvent at next-002.vercel.app: visitors, people who book events, and hosts
         who list events. By using DevEvent you agree to them. If you don&apos;t agree, please don&apos;t use the service.
@@ -46,11 +46,20 @@ export default function TermsPage() {
       <ul>
         <li>You must be 18 or older and give accurate details about yourself and, if you host as a company, your company.</li>
         <li>
+          Before you can create events we verify you: your identity, your company (or, for individuals, the sponsors behind
+          your events), and that each company or sponsor you name is really involved. If one of them tells us they aren&apos;t,
+          your account is flagged and you may respond once; a second denial is final.
+        </li>
+        <li>
+          Each event needs a contact person and a letter signed by your company&apos;s CEO approving it. Events that under-18s may
+          attend need a public venue and a named safeguarding contact.
+        </li>
+        <li>
           Event information you give us must be accurate and lawful, and you must have the right to use every image and
           piece of content you send us.
         </li>
         <li>
-          We review every event before it&apos;s published. We may ask for more information, edit listings for clarity or
+          We review every event, and every change to a live event, before visitors see it. We may ask for more information, edit listings for clarity or
           format, or refuse or remove a listing that breaks these terms or that we believe is misleading or unsafe.
         </li>
         <li>
@@ -94,7 +103,7 @@ export default function TermsPage() {
 
       <h2>8. Other services</h2>
       <p>
-        DevEvent links to and uses other services, such as Google, GitHub and LinkedIn sign-in, maps and event websites.
+        DevEvent links to and uses other services, such as Google and GitHub sign-in, Google&apos;s Gemini AI (which hosts can use to make event images), maps and event websites. Images made with AI must still follow these terms, and you&apos;re responsible for what you submit.
         Their own terms and privacy policies apply when you use them.
       </p>
 

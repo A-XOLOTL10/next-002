@@ -5,6 +5,7 @@ import Image from "next/image"
 import type { EventFormState } from "@/lib/actions/admin.actions"
 import type { EventFormValues } from "@/lib/admin-data"
 import { DEFAULT_TIMEZONE, EVENT_MODES, IMAGE_RULES } from "@/database/event.constants"
+import { cloudinaryLoader, isCloudinaryUrl } from "@/lib/image-loader"
 
 type Props = {
   /** createEventAction, or updateEventAction bound to the event's slug. */
@@ -12,6 +13,12 @@ type Props = {
   /** Current values when editing; omitted when creating. */
   initial?: EventFormValues
   submitLabel: string
+  /** Extra sections (the host form adds contact, sponsors, safety and the signed letter). */
+  children?: ReactNode | ((errors?: Record<string, string>) => ReactNode)
+  /** Replaces the submit button (the host form has "Save draft" and "Send for review"). */
+  actions?: (pending: boolean) => ReactNode
+  /** Hosts can save incomplete drafts; the server checks everything when they send it for review. */
+  relaxed?: boolean
 }
 
 // A fixed list rather than the browser's full one, so server and browser render the same options.
@@ -22,18 +29,21 @@ const COMMON_TIMEZONES = [
 ]
 
 /** Create/edit event form. Field names match the API's form-data parameters. */
-const EventForm = ({ action, initial, submitLabel }: Props) => {
+const EventForm = ({ action, initial, submitLabel, children, actions, relaxed = false }: Props) => {
   const [state, formAction, pending] = useActionState(action, null)
   const isEdit = Boolean(initial)
   // Drafts from the AI import may be incomplete, and can be saved a piece at a time.
-  const required = initial?.status !== "draft"
+  const required = !relaxed && initial?.status !== "draft"
   const existingImages = initial?.images ?? []
 
   // Submitted manually instead of <form action>: a form action resets every field after
   // it runs, which would wipe a long form (and the chosen images) whenever validation fails.
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const formData = new FormData(e.currentTarget)
+    // Saving a live event changes what visitors see straight away: confirm first.
+    if (!relaxed && initial?.status === "published" && !window.confirm("Save these changes to a live event? Visitors will see them immediately.")) return
+    // Includes the pressed button's name/value, so forms with several buttons know which one.
+    const formData = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter)
     startTransition(() => formAction(formData))
   }
 
@@ -59,7 +69,7 @@ const EventForm = ({ action, initial, submitLabel }: Props) => {
           <div className="flex flex-wrap gap-3">
             {existingImages.map((src) => (
               <label key={src} className="flex flex-col gap-1 text-xs">
-                <Image src={src} alt="Current event design" width={180} height={101} className="h-[101px] w-[180px] rounded-md object-cover" />
+                <Image src={src} alt="Current event design" width={180} height={101} loader={isCloudinaryUrl(src) ? cloudinaryLoader : undefined} className="h-[101px] w-[180px] rounded-md object-cover" />
                 <span className="flex items-center gap-1">
                   <input type="checkbox" name="removeImages" value={src} /> Remove
                 </span>
@@ -147,6 +157,8 @@ const EventForm = ({ action, initial, submitLabel }: Props) => {
         <input id="tags" name="tags" required={required} placeholder="Cloud, DevOps, AI" defaultValue={initial?.tags?.join(", ")} className="admin-input" />
       </Field>
 
+      {typeof children === "function" ? children(state?.errors) : children}
+
       {state?.message && (
         <p className="rounded-md border border-red-400/40 px-4 py-3 text-sm text-red-400" role="alert">
           {state.message}
@@ -154,9 +166,11 @@ const EventForm = ({ action, initial, submitLabel }: Props) => {
         </p>
       )}
 
-      <button type="submit" disabled={pending} className="admin-button text-lg">
-        {pending ? "Saving..." : submitLabel}
-      </button>
+      {actions ? actions(pending) : (
+        <button type="submit" disabled={pending} className="admin-button text-lg">
+          {pending ? "Saving..." : submitLabel}
+        </button>
+      )}
     </form>
   )
 }

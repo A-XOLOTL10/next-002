@@ -5,6 +5,7 @@ import LightRays from '@/components/LightRays';
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import { ViewTransition } from "react";
 
 // A fixed year, not new Date(): reading the clock while prerendering is a build error with
 // Cache Components, and the year in a footer doesn't need to be live.
@@ -56,12 +57,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           />
         </div>
 
-        <main>
-          {children}
+        {/* flex-1: the main area always fills the screen, so the footer stays at the bottom
+            instead of rising into view while a page is still loading, then jumping down. */}
+        <main className="w-full flex-1">
+          {/* A short, browser-native crossfade between pages (see the view-transition rules in
+              globals.css). No animation library, and nothing runs on first load. */}
+          <ViewTransition>
+            {children}
+          </ViewTransition>
         </main>
 
         {/* Google, GitHub and LinkedIn sign-in reviews check that every page links to these. */}
-        <footer className="text-light-200 mt-auto flex flex-wrap justify-center gap-6 py-8 text-sm">
+        <footer style={{ viewTransitionName: "site-footer" }} className="text-light-200 flex flex-wrap justify-center gap-6 py-8 text-sm">
           <span>&copy; {COPYRIGHT_YEAR} DevEvent</span>
           <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
           <Link href="/terms" className="hover:underline">Terms and Conditions</Link>

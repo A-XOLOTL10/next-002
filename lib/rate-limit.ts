@@ -10,9 +10,18 @@ const MINUTE = 60 * 1000
 
 /** How many attempts each action gets in its window. */
 export const LIMITS = {
-  login: { attempts: 5, windowMs: 15 * MINUTE }, // guessing the admin password
+  login: { attempts: 5, windowMs: 15 * MINUTE }, // guessing a password from one address
+  // One account from any address: stops guessing spread over many addresses.
+  loginAccount: { attempts: 10, windowMs: 15 * MINUTE },
   // All addresses together: a hard cap even if an attacker keeps changing (or faking) their address.
-  loginAll: { attempts: 50, windowMs: 15 * MINUTE },
+  loginAll: { attempts: 200, windowMs: 15 * MINUTE },
+  signup: { attempts: 5, windowMs: 60 * MINUTE }, // account creation per address
+  emailLink: { attempts: 3, windowMs: 60 * MINUTE }, // verification / reset emails per address
+  verification: { attempts: 5, windowMs: 60 * MINUTE }, // host verification submissions
+  hostEvent: { attempts: 30, windowMs: 60 * MINUTE }, // host event saves
+  aiImage: { attempts: 10, windowMs: 24 * 60 * MINUTE }, // AI images per host per day (paid per image)
+  report: { attempts: 5, windowMs: 60 * MINUTE }, // "report this event" per address
+  activity: { attempts: 120, windowMs: 60 * MINUTE }, // browser activity batches per admin
   publishPin: { attempts: 5, windowMs: 15 * MINUTE }, // guessing the publish PIN
   bookingPerIp: { attempts: 20, windowMs: 60 * MINUTE }, // bots filling in the booking form
   bookingEmail: { attempts: 3, windowMs: 60 * MINUTE }, // flooding someone's inbox with links
@@ -61,6 +70,16 @@ export async function consumeAttempt(
     // If the limiter's own storage is down, public forms keep working; secrets stay guarded.
     console.error("Rate limit check failed:", e)
     return !failClosed
+  }
+}
+
+/** Gives one attempt back, e.g. when an AI image failed through no fault of the user. */
+export async function releaseAttempt(key: string): Promise<void> {
+  try {
+    await connectDB()
+    await RateLimit.updateOne({ key, count: { $gt: 0 } }, { $inc: { count: -1 } })
+  } catch (e) {
+    console.error("Rate limit release failed:", e)
   }
 }
 
