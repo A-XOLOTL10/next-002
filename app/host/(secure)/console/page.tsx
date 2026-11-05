@@ -5,6 +5,9 @@ import { hasEnded, isHiddenFromVisitors } from "@/lib/utils"
 import DeleteEventButton from "@/components/admin/DeleteEventButton"
 import AdminNav from "@/components/admin/AdminNav"
 
+// Depends on the signed-in account, so it waits for its data (behind the session loader).
+export const instant = false
+
 // The heading renders instantly; the table reads the session cookie (request-time
 // data), so it streams in behind <Suspense>.
 export default function AdminDashboardPage() {
@@ -15,8 +18,8 @@ export default function AdminDashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold">Manage Events</h1>
         <div className="flex flex-wrap gap-3">
-          <Link href="/admin/import" className="border-dark-200 rounded-[6px] border px-4 py-2 font-semibold hover:underline">AI Import</Link>
-          <Link href="/admin/events/new" className="admin-button">+ Create event</Link>
+          <Link href="/host/console/import" className="border-dark-200 rounded-[6px] border px-4 py-2 font-semibold hover:underline">AI Import</Link>
+          <Link href="/host/console/events/new" className="admin-button">+ Create event</Link>
         </div>
       </div>
 
@@ -35,7 +38,7 @@ function visibility(event: AdminEventSummary): { label: string; style: string } 
 }
 
 async function EventsTable() {
-  // Redirects to /admin/login if not signed in. This session check also calls connection(),
+  // Signed-in admins only (checked in lib/admin-data.ts). This session check also calls connection(),
   // so everything below runs at request time and can safely read the current time.
   const [events, draftCount] = await Promise.all([getEventsWithBookingCounts(), getDraftCount()])
 
@@ -44,13 +47,13 @@ async function EventsTable() {
       {draftCount > 0 && (
         <p className="notice">
           {draftCount} {draftCount === 1 ? "draft is" : "drafts are"} waiting for review.{" "}
-          <Link href="/admin/drafts" className="font-semibold underline">Preview and publish</Link>
+          <Link href="/host/console/drafts" className="font-semibold underline">Preview and publish</Link>
         </p>
       )}
 
       {events.length === 0 ? (
         <p>
-          No published events yet. <Link href="/admin/events/new" className="underline">Create one</Link>, or run{" "}
+          No published events yet. <Link href="/host/console/events/new" className="underline">Create one</Link>, or run{" "}
           <code className="font-mono">npm run seed</code> to add sample events.
         </p>
       ) : (
@@ -73,7 +76,7 @@ async function EventsTable() {
                 return (
                   <tr key={event.slug} className="border-dark-200 border-b align-top">
                     <td className="py-3 pr-4">
-                      <Link href={`/admin/drafts/${event.slug}`} className="hover:underline">{event.title}</Link>
+                      <Link href={`/host/console/drafts/${event.slug}`} className="hover:underline">{event.title}</Link>
                     </td>
                     <td className="py-3 pr-4 whitespace-nowrap">{event.date}</td>
                     <td className={`py-3 pr-4 whitespace-nowrap ${style}`}>{label}</td>
@@ -82,8 +85,8 @@ async function EventsTable() {
                     <td className="py-3 pr-4 text-right">{event.checkedInCount}</td>
                     <td className="py-3">
                       <div className="flex flex-wrap gap-4">
-                        <Link href={`/admin/events/${event.slug}`} className="hover:underline">Bookings</Link>
-                        <Link href={`/admin/events/${event.slug}/edit`} className="hover:underline">Edit</Link>
+                        <Link href={`/host/console/events/${event.slug}`} className="hover:underline">Bookings</Link>
+                        <Link href={`/host/console/events/${event.slug}/edit`} className="hover:underline">Edit</Link>
                         <DeleteEventButton slug={event.slug} title={event.title} />
                       </div>
                     </td>

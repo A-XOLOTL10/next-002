@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { deleteSession } from "@/lib/auth";
+import { signOut } from "@/lib/auth";
 
-/** POST /api/auth/logout: clears the admin session cookie. */
+/** POST /api/auth/logout: ends this session (deletes it from the database and clears the cookie). */
 export async function POST() {
-    await deleteSession();
+    await signOut();
     return NextResponse.json({ message: "Signed out" }, { status: 200 });
 }

@@ -20,9 +20,11 @@ interface Props {
     timezone?: string;
     endsAt?: string;
     hideAt?: string;
+    /** First row of cards: load the image straight away (it's the page's largest paint). */
+    preload?: boolean;
 }
 
-const EventCard = ({ title, image, images, imageDisplay = "static", slug, location, date, time, timezone, endsAt, hideAt }: Props) => {
+const EventCard = ({ title, image, images, imageDisplay = "static", slug, location, date, time, timezone, endsAt, hideAt, preload = false }: Props) => {
     // Pages are cached, so "has it ended?" is worked out here, in the visitor's browser.
     const now = useNow();
     const passed = (moment?: string) => now > 0 && Boolean(moment) && new Date(moment as string).getTime() <= now;
@@ -57,6 +59,7 @@ const EventCard = ({ title, image, images, imageDisplay = "static", slug, locati
                     display={ended ? "static" : imageDisplay}
                     title={title}
                     sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+                    preload={preload}
                 />
                 {ended && <span className="ended-overlay">Ended</span>}
             </div>

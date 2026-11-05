@@ -3,9 +3,40 @@
 export const EVENT_MODES = ["online", "offline", "hybrid"] as const
 export type EventMode = (typeof EVENT_MODES)[number]
 
-/** "draft" events are invisible to visitors until an admin previews and publishes them. */
-export const EVENT_STATUSES = ["draft", "published"] as const
+/**
+ * Only "published" events are visible to visitors. The others:
+ * - draft: being written (by an admin, or by a host before sending it for review)
+ * - in_review: a host sent it; waiting for an admin to check it and contact the organizations
+ * - changes_requested: the admin asked the host to fix something; the host edits and resends
+ * - rejected: refused for good (the reason is recorded)
+ * - cancelled: was live, then cancelled; everyone who booked was emailed
+ */
+export const EVENT_STATUSES = ["draft", "in_review", "changes_requested", "rejected", "published", "cancelled"] as const
 export type EventStatus = (typeof EVENT_STATUSES)[number]
+
+export const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
+  draft: "Draft",
+  in_review: "Waiting for review",
+  changes_requested: "Changes requested",
+  rejected: "Rejected",
+  published: "Live",
+  cancelled: "Cancelled",
+}
+
+/** Statuses in which the host may still edit the event directly (live events go through a revision). */
+export const HOST_EDITABLE_STATUSES: readonly EventStatus[] = ["draft", "changes_requested"]
+
+/**
+ * Who the event is for. Events open to under-18s need a public venue and a named safeguarding
+ * contact, so young people are never drawn to a private or unverified place.
+ */
+export const AUDIENCE_AGES = ["adults", "all_ages", "under_18"] as const
+export type AudienceAge = (typeof AUDIENCE_AGES)[number]
+export const AUDIENCE_AGE_LABELS: Record<AudienceAge, string> = {
+  adults: "Adults only (18+)",
+  all_ages: "All ages (under-18s welcome)",
+  under_18: "Mainly for under-18s (students, kids' coding)",
+}
 
 /** Where an event came from: the admin form/API, or the AI import. */
 export const EVENT_SOURCES = ["manual", "ai-import"] as const

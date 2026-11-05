@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
-import mongoose, { Schema, model, models, mongo, type Model } from "mongoose";
+import mongoose, { Schema, model, models, mongo, type Model, type Types } from "mongoose";
 import {
+  AUDIENCE_AGES,
+  type AudienceAge,
   DEFAULT_TIMEZONE,
   EVENT_MODES,
   EVENT_SOURCES,
@@ -40,6 +42,22 @@ export interface IEvent {
   source: EventSource;
   importNotes: string[]; // what the AI import wants the admin to check
   publishedAt?: Date;
+  // ---- host-created events (absent on events an admin created) ----
+  ownerId?: Types.ObjectId; // the host's user id
+  /** Who the admin calls about this event. Never shown to visitors. */
+  hostContact?: { name: string; phone: string; email: string };
+  /** Companies/sponsors behind the event (organizations from the host's verification file). */
+  sponsors: { orgId: Types.ObjectId; name: string; confirmed: boolean }[];
+  audienceAge?: AudienceAge;
+  /** Required when under-18s may attend: who is responsible for their safety on the day. */
+  safeguardingContact?: { name: string; phone: string };
+  /** The signed letter from the company's CEO approving the event (a PrivateFile id). */
+  authorizationLetterId?: Types.ObjectId;
+  review?: { submittedAt?: Date; reviewedAt?: Date; reviewedBy?: Types.ObjectId; reviewedByName?: string; reason?: string };
+  /** SHA-256 of exactly what an admin approved, also recorded in the activity log. */
+  approvedSnapshotHash?: string;
+  cancelledAt?: Date;
+  cancelReason?: string;
   // Exact moments, computed from the local date/time/timezone on save, so events can be
   // sorted and filtered in the database.
   startsAt?: Date;
@@ -129,6 +147,43 @@ const EventSchema = new Schema<IEvent>(
     source: { type: String, enum: EVENT_SOURCES, default: "manual" },
     importNotes: { type: [String], default: [] },
     publishedAt: { type: Date },
+    ownerId: { type: Schema.Types.ObjectId, ref: "User" },
+    hostContact: new Schema(
+      {
+        name: { type: String, trim: true, maxlength: 120 },
+        phone: { type: String, trim: true, maxlength: 40 },
+        email: { type: String, trim: true, lowercase: true, maxlength: 254 },
+      },
+      { _id: false },
+    ),
+    sponsors: {
+      type: [
+        new Schema(
+          { orgId: { type: Schema.Types.ObjectId, required: true }, name: { type: String, required: true }, confirmed: { type: Boolean, default: false } },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
+    audienceAge: { type: String, enum: AUDIENCE_AGES },
+    safeguardingContact: new Schema(
+      { name: { type: String, trim: true, maxlength: 120 }, phone: { type: String, trim: true, maxlength: 40 } },
+      { _id: false },
+    ),
+    authorizationLetterId: { type: Schema.Types.ObjectId, ref: "PrivateFile" },
+    review: new Schema(
+      {
+        submittedAt: Date,
+        reviewedAt: Date,
+        reviewedBy: { type: Schema.Types.ObjectId, ref: "User" },
+        reviewedByName: String,
+        reason: { type: String, maxlength: 2000 },
+      },
+      { _id: false },
+    ),
+    approvedSnapshotHash: { type: String },
+    cancelledAt: { type: Date },
+    cancelReason: { type: String, maxlength: 2000 },
     startsAt: { type: Date },
     endsAt: { type: Date },
     hideAt: { type: Date },
@@ -140,6 +195,8 @@ const EventSchema = new Schema<IEvent>(
 EventSchema.index({ slug: 1 }, { unique: true });
 // Every visitor list: published, still visible, closest first.
 EventSchema.index({ status: 1, hideAt: 1, startsAt: 1 });
+// A host's own events, and the admin review queue.
+EventSchema.index({ ownerId: 1, createdAt: -1 });
 
 /** "AWS re:Invent 2026" -> "aws-reinvent-2026" */
 function slugify(title: string): string {

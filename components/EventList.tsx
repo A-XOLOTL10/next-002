@@ -10,15 +10,30 @@ const EventList = ({ events, emptyText }: { events: EventListItem[]; emptyText: 
 
   return (
     <ul className="events">
-      {events.map((event) => (
+      {events.map((event, index) => (
         // Unique per event (titles can repeat); slug is unique too, for bundled samples without an _id.
         <li className="list-none" key={event._id ?? event.slug}>
-          <EventCard {...event} />
+          {/* The first row (up to 3 cards) is above the fold on most screens: load those images first. */}
+          <EventCard {...event} preload={index < 3} />
         </li>
       ))}
     </ul>
   )
 }
+
+/** Placeholder cards the same size as real ones, shown while the list loads (no layout shift). */
+export const EventListSkeleton = ({ count = 3 }: { count?: number }) => (
+  <ul className="events" aria-busy="true" aria-label="Loading events">
+    {Array.from({ length: count }, (_, index) => (
+      <li key={index} className="list-none flex flex-col gap-3">
+        <div className="skeleton h-[300px] w-full" />
+        <div className="skeleton h-4 w-1/2" />
+        <div className="skeleton h-6 w-4/5" />
+        <div className="skeleton h-4 w-2/3" />
+      </li>
+    ))}
+  </ul>
+)
 
 /**
  * The order and filter every visitor list uses: hidden events go, and events still to come

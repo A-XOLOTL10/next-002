@@ -1,10 +1,13 @@
 import { Suspense } from "react"
-import Image from "next/image"
+import CloudImage from "@/components/CloudImage"
 import Link from "next/link"
 import AdminNav from "@/components/admin/AdminNav"
 import DeleteEventButton from "@/components/admin/DeleteEventButton"
 import PublishPanel from "@/components/admin/PublishPanel"
 import { getDrafts } from "@/lib/admin-data"
+
+// Depends on the signed-in account, so it waits for its data (behind the session loader).
+export const instant = false
 
 export default function DraftsPage() {
   return (
@@ -25,14 +28,14 @@ export default function DraftsPage() {
 }
 
 async function DraftList() {
-  // Redirects to /admin/login if not signed in.
+  // Signed-in admins only (checked in lib/admin-data.ts).
   const drafts = await getDrafts()
 
   if (drafts.length === 0) {
     return (
       <p>
-        No drafts right now. <Link href="/admin/import" className="underline">Import event forms</Link> or{" "}
-        <Link href="/admin/events/new" className="underline">create an event</Link>.
+        No drafts right now. <Link href="/host/console/import" className="underline">Import event forms</Link> or{" "}
+        <Link href="/host/console/events/new" className="underline">create an event</Link>.
       </p>
     )
   }
@@ -45,11 +48,11 @@ async function DraftList() {
         {drafts.map((draft) => (
           <div key={draft.slug} className="bg-dark-100 border-dark-200 flex flex-wrap gap-4 rounded-[10px] border p-4">
             <div className="bg-dark-200 relative h-[101px] w-[180px] shrink-0 overflow-hidden rounded-md">
-              {draft.image && <Image src={draft.image} alt="" fill sizes="180px" className="object-cover" />}
+              {draft.image && <CloudImage src={draft.image} alt="" fill sizes="180px" className="object-cover" />}
             </div>
 
             <div className="flex min-w-60 flex-1 flex-col gap-1">
-              <Link href={`/admin/drafts/${draft.slug}`} className="text-lg font-semibold hover:underline">{draft.title}</Link>
+              <Link href={`/host/console/drafts/${draft.slug}`} className="text-lg font-semibold hover:underline">{draft.title}</Link>
               <p className="text-light-200 text-sm">
                 {[draft.date, draft.location].filter(Boolean).join(" · ") || "No date or location yet"}
                 {draft.source === "ai-import" && " · from AI import"}
@@ -66,8 +69,8 @@ async function DraftList() {
               ))}
 
               <div className="mt-1 flex flex-wrap gap-4 text-sm">
-                <Link href={`/admin/drafts/${draft.slug}`} className="font-semibold hover:underline">Preview</Link>
-                <Link href={`/admin/events/${draft.slug}/edit`} className="hover:underline">Edit</Link>
+                <Link href={`/host/console/drafts/${draft.slug}`} className="font-semibold hover:underline">Preview</Link>
+                <Link href={`/host/console/events/${draft.slug}/edit`} className="hover:underline">Edit</Link>
                 <DeleteEventButton slug={draft.slug} title={draft.title} />
               </div>
             </div>

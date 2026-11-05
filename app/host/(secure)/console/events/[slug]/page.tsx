@@ -13,7 +13,7 @@ const formatBookedAt = (iso: string): string =>
 // makes React fall back to client rendering and log error #419).
 export const instant = false
 
-export default function AdminEventBookingsPage({ params }: PageProps<"/admin/events/[slug]">) {
+export default function AdminEventBookingsPage({ params }: PageProps<"/host/console/events/[slug]">) {
   return (
     <>
       <AdminNav />
@@ -22,10 +22,10 @@ export default function AdminEventBookingsPage({ params }: PageProps<"/admin/eve
   )
 }
 
-async function BookingsTable({ params }: Pick<PageProps<"/admin/events/[slug]">, "params">) {
+async function BookingsTable({ params }: Pick<PageProps<"/host/console/events/[slug]">, "params">) {
   const { slug } = await params
 
-  // Redirects to /admin/login if not signed in.
+  // Signed-in admins only (checked in lib/admin-data.ts).
   const data = await getEventBookings(slug)
   if (!data) notFound()
 
@@ -43,7 +43,7 @@ async function BookingsTable({ params }: Pick<PageProps<"/admin/events/[slug]">,
           </p>
           <div className="flex flex-wrap gap-4 text-sm">
             <Link href={`/events/${slug}`} className="hover:underline">View public page</Link>
-            <Link href={`/admin/events/${slug}/edit`} className="hover:underline">Edit event</Link>
+            <Link href={`/host/console/events/${slug}/edit`} className="hover:underline">Edit event</Link>
             <DeleteEventButton slug={slug} title={event.title} />
           </div>
         </div>

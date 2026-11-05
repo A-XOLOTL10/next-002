@@ -13,7 +13,7 @@ import { hasEnded } from "@/lib/utils"
 // makes React fall back to client rendering and log error #419).
 export const instant = false
 
-export default function EventPreviewPage({ params }: PageProps<"/admin/drafts/[slug]">) {
+export default function EventPreviewPage({ params }: PageProps<"/host/console/drafts/[slug]">) {
   return (
     <>
       <AdminNav />
@@ -22,10 +22,10 @@ export default function EventPreviewPage({ params }: PageProps<"/admin/drafts/[s
   )
 }
 
-async function Preview({ params }: Pick<PageProps<"/admin/drafts/[slug]">, "params">) {
+async function Preview({ params }: Pick<PageProps<"/host/console/drafts/[slug]">, "params">) {
   const { slug } = await params
 
-  // Redirects to /admin/login if not signed in.
+  // Signed-in admins only (checked in lib/admin-data.ts).
   const event = await getEventPreview(slug)
   if (!event) notFound()
 
@@ -41,8 +41,8 @@ async function Preview({ params }: Pick<PageProps<"/admin/drafts/[slug]">, "para
             {isDraft ? "Draft preview: visitors can't see this yet" : "Published: this is what visitors see"}
           </p>
           <div className="flex flex-wrap gap-4 text-sm">
-            <Link href={`/admin/events/${event.slug}/edit`} className="hover:underline">Edit</Link>
-            {!isDraft && <Link href={`/admin/events/${event.slug}`} className="hover:underline">Bookings</Link>}
+            <Link href={`/host/console/events/${event.slug}/edit`} className="hover:underline">Edit</Link>
+            {!isDraft && <Link href={`/host/console/events/${event.slug}`} className="hover:underline">Bookings</Link>}
             <DeleteEventButton slug={event.slug} title={event.title} />
           </div>
         </div>
@@ -65,7 +65,7 @@ async function Preview({ params }: Pick<PageProps<"/admin/drafts/[slug]">, "para
                 {missing.length > 0 ? (
                   <p className="notice">
                     Add these before publishing: <strong>{missing.join(", ")}</strong>.{" "}
-                    <Link href={`/admin/events/${event.slug}/edit`} className="underline">Edit</Link>
+                    <Link href={`/host/console/events/${event.slug}/edit`} className="underline">Edit</Link>
                   </p>
                 ) : ended ? (
                   <p className="notice">This event has already ended, so it can&apos;t be published.</p>

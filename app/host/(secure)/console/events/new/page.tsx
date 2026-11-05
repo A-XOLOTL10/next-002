@@ -4,6 +4,9 @@ import EventForm from "@/components/admin/EventForm"
 import { createEventAction } from "@/lib/actions/admin.actions"
 import { requireAdmin } from "@/lib/auth"
 
+// Depends on the signed-in account, so it waits for its data (behind the session loader).
+export const instant = false
+
 export default function NewEventPage() {
   return (
     <>
@@ -19,7 +22,7 @@ export default function NewEventPage() {
 }
 
 async function AuthorizedForm() {
-  // Redirects to /admin/login if not signed in. createEventAction checks again on submit.
+  // Signed-in admins only (checked in lib/admin-data.ts). createEventAction checks again on submit.
   await requireAdmin()
   return <EventForm action={createEventAction} submitLabel="Create event" />
 }

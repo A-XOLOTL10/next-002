@@ -327,3 +327,77 @@
     }
   }
 }
+/* ---------------------------------------------------------------- page transitions
+   React's <ViewTransition> (app/layout.tsx) uses the browser's View Transitions API: the
+   browser snapshots the old page, swaps in the new one and crossfades them on the GPU. Short
+   durations keep navigation feeling instant; browsers without support just switch pages. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+}
+
+/* The header and footer stay put while content fades. */
+::view-transition-group(site-header),
+::view-transition-group(site-footer) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header),
+::view-transition-old(site-footer) {
+  display: none;
+}
+::view-transition-new(site-header),
+::view-transition-new(site-footer) {
+  animation: none;
+}
+
+/* Clicks during a transition go to the live page instead of being swallowed. */
+::view-transition {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* Navbar link loading bar (components/NavLink.tsx). It appears only after 120ms, so fast
+   navigations don't flicker. */
+.nav-pending {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-primary, #59deca);
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+}
+.nav-pending.is-pending {
+  animation: nav-pending 1.2s ease-out 120ms forwards;
+}
+@keyframes nav-pending {
+  0% { opacity: 1; transform: scaleX(0.05); }
+  100% { opacity: 1; transform: scaleX(0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-pending.is-pending { animation: none; opacity: 1; transform: scaleX(1); }
+}
+
+/* Loading placeholders shaped like the real content, so nothing jumps when it arrives. */
+.skeleton {
+  @apply bg-dark-100 rounded-[10px];
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}

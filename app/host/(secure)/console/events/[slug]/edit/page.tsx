@@ -10,7 +10,7 @@ import { getEventForEdit } from "@/lib/admin-data"
 // makes React fall back to client rendering and log error #419).
 export const instant = false
 
-export default function EditEventPage({ params }: PageProps<"/admin/events/[slug]/edit">) {
+export default function EditEventPage({ params }: PageProps<"/host/console/events/[slug]/edit">) {
   return (
     <>
       <AdminNav />
@@ -19,10 +19,10 @@ export default function EditEventPage({ params }: PageProps<"/admin/events/[slug
   )
 }
 
-async function EditForm({ params }: Pick<PageProps<"/admin/events/[slug]/edit">, "params">) {
+async function EditForm({ params }: Pick<PageProps<"/host/console/events/[slug]/edit">, "params">) {
   const { slug } = await params
 
-  // Redirects to /admin/login if not signed in.
+  // Signed-in admins only (checked in lib/admin-data.ts).
   const event = await getEventForEdit(slug)
   if (!event) notFound()
 
@@ -34,7 +34,7 @@ async function EditForm({ params }: Pick<PageProps<"/admin/events/[slug]/edit">,
           {event.status === "draft"
             ? "Drafts can be saved with details missing; everything is needed before publishing."
             : "Existing bookings are kept, and the event's web address stays the same."}{" "}
-          <Link href={`/admin/drafts/${slug}`} className="underline">Back to preview</Link>
+          <Link href={`/host/console/drafts/${slug}`} className="underline">Back to preview</Link>
         </p>
       </div>
       {/* Bound to the current slug; the action redirects to the (possibly new) slug when saved. */}

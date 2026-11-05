@@ -5,6 +5,9 @@ import ImportForm from "@/components/admin/ImportForm"
 import { requireAdmin } from "@/lib/auth"
 import { REQUEST_FORM_QUESTIONS, REQUEST_REPLY_TEMPLATE, TEMPLATE_JSON_EXAMPLE } from "@/lib/event-request-form"
 
+// Depends on the signed-in account, so it waits for its data (behind the session loader).
+export const instant = false
+
 export default function ImportPage() {
   return (
     <>
@@ -26,7 +29,7 @@ export default function ImportPage() {
 }
 
 async function ImportSection() {
-  // Redirects to /admin/login if not signed in. importEventsAction checks again on submit.
+  // Signed-in admins only (checked in lib/admin-data.ts). importEventsAction checks again on submit.
   await requireAdmin()
 
   return (

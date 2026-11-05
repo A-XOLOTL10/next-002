@@ -9,7 +9,13 @@ const PublishPanel = ({ slugs, label }: { slugs: string[]; label: string }) => {
   const [state, formAction, pending] = useActionState<PublishState, FormData>(publishEventsAction.bind(null, slugs), null)
 
   return (
-    <form action={formAction} className="bg-dark-100 border-dark-200 flex flex-col gap-3 rounded-[10px] border px-5 py-5">
+    <form
+      action={formAction}
+      // The PIN proves who is publishing; this asks whether they really mean to.
+      onSubmit={(e) => {
+        if (!window.confirm(`Publish ${slugs.length === 1 ? "this event" : `these ${slugs.length} events`} now? Visitors will see ${slugs.length === 1 ? "it" : "them"} immediately.`)) e.preventDefault()
+      }}
+      className="bg-dark-100 border-dark-200 flex flex-col gap-3 rounded-[10px] border px-5 py-5">
       <label htmlFor="pin" className="text-sm font-semibold">Publish PIN</label>
       <input
         id="pin"
@@ -25,7 +31,7 @@ const PublishPanel = ({ slugs, label }: { slugs: string[]; label: string }) => {
 
       {state?.outcome?.failed.map((failure) => (
         <p key={failure.slug} className="text-xs text-red-400">
-          <Link href={`/admin/drafts/${failure.slug}`} className="underline">{failure.title}</Link>: {failure.message}
+          <Link href={`/host/console/drafts/${failure.slug}`} className="underline">{failure.title}</Link>: {failure.message}
           {failure.errors && ` (${Object.keys(failure.errors).join(", ")})`}
         </p>
       ))}

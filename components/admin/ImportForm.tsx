@@ -55,7 +55,7 @@ const ImportForm = () => {
             <div key={`${event.title}-${index}`} className="border-dark-200 flex flex-col gap-1 rounded-md border px-4 py-3 text-sm">
               <p>
                 <span className={`font-semibold capitalize ${OUTCOME_STYLE[event.outcome]}`}>{event.outcome}: </span>
-                {event.slug ? <Link href={`/admin/drafts/${event.slug}`} className="underline">{event.title}</Link> : event.title}
+                {event.slug ? <Link href={`/host/console/drafts/${event.slug}`} className="underline">{event.title}</Link> : event.title}
               </p>
               {event.message && <p className="text-light-200">{event.message}</p>}
               {event.notes.map((note) => <p key={note} className="text-amber-400">{note}</p>)}
@@ -63,7 +63,7 @@ const ImportForm = () => {
           ))}
 
           {state.events.some((event) => event.outcome === "created") && (
-            <Link href="/admin/drafts" className="admin-button w-fit">Review drafts</Link>
+            <Link href="/host/console/drafts" className="admin-button w-fit">Review drafts</Link>
           )}
         </div>
       )}

@@ -1,19 +1,23 @@
 import { Suspense } from "react"
 import { connection } from "next/server"
-import AdminNav from "@/components/admin/AdminNav"
+import { StaffNav } from "@/components/host/HostNav"
 import CheckInPanel from "@/components/admin/CheckInPanel"
 import { getTicketForCheckIn } from "@/lib/admin-data"
-import { requireAdmin } from "@/lib/auth"
+import { requireUser } from "@/lib/auth"
 import { formatEventDate, hasEnded } from "@/lib/utils"
+
+// Depends on the signed-in account, so it waits for its data (behind the session loader).
+export const instant = false
 
 const formatCheckedIn = (iso: string): string =>
   new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(iso)) + " UTC"
 
-// Where a ticket's QR code leads. Door staff scan it with any phone camera, or type the ticket ID.
-export default function CheckInPage({ searchParams }: PageProps<"/admin/check-in">) {
+// Ticket check-in for admins (any ticket) and hosts (tickets for their own events only). Door
+// staff scan a QR code with any phone camera (it opens /t/DEV-..., which forwards here) or type the ID.
+export default function CheckInPage({ searchParams }: PageProps<"/host/check-in">) {
   return (
     <>
-      <AdminNav />
+      <StaffNav />
       <h1 className="text-3xl font-bold">Ticket Check-in</h1>
 
       {/* searchParams and the session cookie are request-time data, so this streams in. */}
@@ -24,10 +28,10 @@ export default function CheckInPage({ searchParams }: PageProps<"/admin/check-in
   )
 }
 
-async function CheckIn({ searchParams }: Pick<PageProps<"/admin/check-in">, "searchParams">) {
+async function CheckIn({ searchParams }: Pick<PageProps<"/host/check-in">, "searchParams">) {
   await connection()
-  // Redirects to /admin/login if not signed in, so only staff can use a scanned code.
-  await requireAdmin()
+  // Signed-in accounts only; getTicketForCheckIn hides tickets for events this account doesn't run.
+  await requireUser()
 
   const { ticket } = await searchParams
   const query = typeof ticket === "string" ? ticket.trim() : ""
@@ -35,7 +39,7 @@ async function CheckIn({ searchParams }: Pick<PageProps<"/admin/check-in">, "sea
   return (
     <div className="flex max-w-lg flex-col gap-6">
       {/* A plain GET form: looking a ticket up changes nothing. */}
-      <form className="flex gap-2" action="/admin/check-in">
+      <form className="flex gap-2" action="/host/check-in">
         <input
           name="ticket"
           defaultValue={query}

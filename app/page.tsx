@@ -2,8 +2,9 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { connection } from "next/server"
 import ExploreBtn from "@/components/ExploreBtn"
-import EventList, { visibleEvents } from "@/components/EventList"
+import EventList, { EventListSkeleton, visibleEvents } from "@/components/EventList"
 import { getEventCards } from "@/lib/actions/events.actions"
+import LiveRefresh from "@/components/LiveRefresh"
 
 const FEATURED_LIMIT = 6
 
@@ -24,7 +25,7 @@ const page = () => {
           <Link href="/events" className="text-sm hover:underline">See all events &rarr;</Link>
         </div>
 
-        <Suspense fallback={<p className="text-light-200">Loading events...</p>}>
+        <Suspense fallback={<EventListSkeleton />}>
           <FeaturedEvents />
         </Suspense>
       </div>
@@ -40,10 +41,14 @@ async function FeaturedEvents() {
   const events = await getEventCards()
 
   return (
-    <EventList
-      events={visibleEvents(events).slice(0, FEATURED_LIMIT)}
-      emptyText="No upcoming events right now. Check back soon!"
-    />
+    <>
+      <EventList
+        events={visibleEvents(events).slice(0, FEATURED_LIMIT)}
+        emptyText="No upcoming events right now. Check back soon!"
+      />
+      {/* New or changed events appear without a reload. */}
+      <LiveRefresh />
+    </>
   )
 }
 

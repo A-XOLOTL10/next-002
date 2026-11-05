@@ -3,7 +3,8 @@ import connectDB from "@/lib/mongodb"
 import Event, { type IEvent } from "@/database/event.model"
 import Booking, { type BookingStatus } from "@/database/booking.model"
 import type { EventStatus, ImageDisplay } from "@/database/event.constants"
-import { requireAdmin } from "@/lib/auth"
+import { requireAdmin, requireUser } from "@/lib/auth"
+import { isAdminRole } from "@/database/user.constants"
 import { findMissingFields } from "@/lib/events.service"
 import { toList } from "@/lib/utils"
 
@@ -113,7 +114,8 @@ export async function getDrafts(): Promise<DraftSummary[]> {
   await requireAdmin()
   await connectDB()
 
-  const drafts = await Event.find({ status: "draft" }).sort({ createdAt: 1 }).lean()
+  // Admin drafts only: a host's unfinished drafts are theirs, and host events are reviewed in Approvals.
+  const drafts = await Event.find({ status: "draft", ownerId: { $exists: false } }).sort({ createdAt: 1 }).lean()
 
   return drafts.map((draft) => ({
     slug: draft.slug,
@@ -130,7 +132,7 @@ export async function getDrafts(): Promise<DraftSummary[]> {
 export async function getDraftCount(): Promise<number> {
   await requireAdmin()
   await connectDB()
-  return Event.countDocuments({ status: "draft" })
+  return Event.countDocuments({ status: "draft", ownerId: { $exists: false } })
 }
 
 /** Any event by slug for the admin preview, or null. Lists are already split into items. */
@@ -209,20 +211,26 @@ export async function getEventForEdit(slug: string): Promise<EventFormValues | n
   }
 }
 
-/** Accepts a ticket ID or a whole scanned check-in link. */
+/** Accepts a ticket ID or a whole scanned link (old "?ticket=DEV-..." links and new "/t/DEV-..." ones). */
 export const parseTicketInput = async (input: string): Promise<string> =>
-  (input.match(/ticket=([\w%-]+)/)?.[1] ?? input).trim().toUpperCase()
+  (input.match(/ticket=([\w%-]+)/)?.[1] ?? input.match(/\/t\/([\w-]+)/)?.[1] ?? input).trim().toUpperCase().slice(0, 40)
 
-/** What door staff see for a scanned ticket, or null if there's no such ticket. */
+/**
+ * What door staff see for a scanned ticket, or null if there's no such ticket or this account
+ * may not see it. Admins see every ticket; a host only tickets for events they own.
+ */
 export async function getTicketForCheckIn(input: string): Promise<TicketCheckIn | null> {
-  await requireAdmin()
+  const session = await requireUser()
   await connectDB()
 
   const ticketId = await parseTicketInput(input)
+  if (!/^DEV-[A-Z0-9]{10}$/.test(ticketId)) return null
   const booking = await Booking.findOne({ ticketId }).lean()
   if (!booking) return null
 
-  const event = await Event.findById(booking.eventId).select("title date time venue location timezone hideAt").lean()
+  const event = await Event.findById(booking.eventId).select("title date time venue location timezone hideAt ownerId").lean()
+  // A host can't look up (or admit) tickets for someone else's event: answer as if it doesn't exist.
+  if (!isAdminRole(session.user.role) && event?.ownerId?.toString() !== session.user.id) return null
 
   return {
     ticketId: booking.ticketId,

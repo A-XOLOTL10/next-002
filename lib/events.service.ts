@@ -47,7 +47,7 @@ const TEXT_FIELDS = [
 const LIST_FIELDS = { agenda: /\r?\n/, tags: /[,\r\n]/ } as const
 
 type EventFields = Partial<Record<(typeof TEXT_FIELDS)[number], string>> & { agenda?: string[]; tags?: string[] }
-type ParsedForm = { fields: EventFields; newImages: File[]; removeImages: string[] }
+export type ParsedForm = { fields: EventFields; newImages: File[]; removeImages: string[] }
 
 const fail = (status: ServiceError["status"], message: string, errors?: Record<string, string>): ServiceError =>
   ({ ok: false, status, message, errors })
@@ -72,7 +72,7 @@ function parseList(formData: FormData, key: keyof typeof LIST_FIELDS): string[] 
   return values.flatMap((v) => v.split(LIST_FIELDS[key])).map((item) => item.trim()).filter(Boolean)
 }
 
-function parseEventForm(formData: FormData): ParsedForm | ServiceError {
+export function parseEventForm(formData: FormData): ParsedForm | ServiceError {
   const fields: EventFields = {}
   const errors: Record<string, string> = {}
 
@@ -183,7 +183,7 @@ export async function uploadImageFromUrl(url: string): Promise<string> {
 }
 
 /** Uploads several files; if any fails, removes the ones already uploaded. */
-async function uploadImageFiles(files: File[]): Promise<string[]> {
+export async function uploadImageFiles(files: File[]): Promise<string[]> {
   const urls: string[] = []
   try {
     for (const file of files) urls.push(await uploadImageFile(file))
@@ -339,6 +339,16 @@ export async function publishEvents(slugs: string[]): Promise<ServiceResult<Publ
       const event = events.find((candidate) => candidate.slug === slug)
       if (!event) {
         outcome.failed.push({ slug, title: slug, message: "Event not found" })
+        continue
+      }
+      // Host events go live only through their own review (sponsor checks, signed letter), and
+      // cancelled or rejected events can't be brought back by publishing them here.
+      if (event.ownerId) {
+        outcome.failed.push({ slug, title: event.title, message: "Host events are approved from Approvals" })
+        continue
+      }
+      if (event.status !== "draft") {
+        outcome.failed.push({ slug, title: event.title, message: event.status === "published" ? "Already live" : `Can't publish a ${event.status} event` })
         continue
       }
 

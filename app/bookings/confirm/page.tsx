@@ -1,5 +1,4 @@
 import { Suspense } from "react"
-import Link from "next/link"
 import type { Metadata } from "next"
 import { connection } from "next/server"
 import { getPendingBooking } from "@/lib/booking-data"
@@ -45,31 +44,18 @@ async function ConfirmDetails({ searchParams }: Pick<PageProps<"/bookings/confir
     return <p className="text-red-400">We couldn&apos;t check your link right now. Please refresh the page to try again.</p>
   }
 
-  if (!details) {
-    return (
-      <div className="flex flex-col gap-4">
-        <p>
-          This confirmation link is invalid, has expired, or was already used. If you already confirmed, your ticket is
-          in your inbox (check the spam folder too).
-        </p>
-        <Link href="/events" className="underline">Browse events and book again</Link>
-      </div>
-    )
-  }
-
-  const { email, event } = details
+  // Always the same component in the same place (see ConfirmBookingButton for why).
   return (
-    <div className="bg-dark-100 border-dark-200 flex flex-col gap-4 rounded-[10px] border px-5 py-6">
-      <p className="text-xl font-semibold">{event.title}</p>
-      <p className="text-light-100">
-        {formatEventDate(event.date)} at {event.time}
-        <br />
-        {event.venue}, {event.location}
-      </p>
-      <p className="text-sm">
-        Booking for <strong>{email}</strong>
-      </p>
-      <ConfirmBookingButton token={tokenValue} />
-    </div>
+    <ConfirmBookingButton
+      token={tokenValue}
+      details={
+        details && {
+          email: details.email,
+          title: details.event.title,
+          when: `${formatEventDate(details.event.date)} at ${details.event.time}`,
+          where: `${details.event.venue}, ${details.event.location}`,
+        }
+      }
+    />
   )
 }
