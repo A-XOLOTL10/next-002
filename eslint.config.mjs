@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The React Native scanner app has its own tooling (npx expo lint, inside mobile/).
+    "mobile/**",
   ]),
 ]);
 

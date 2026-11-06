@@ -22,7 +22,15 @@ export default function PrivacyPage() {
       <ul>
         <li>Your email address, used to confirm the booking and send your ticket.</li>
         <li>Your ticket ID and QR code, the time you booked and confirmed, and the time your ticket was scanned at the event.</li>
+        <li>Whether your ticket is VIP or regular, and which staff member or device checked you in.</li>
         <li>We don&apos;t ask for your name or any payment details to book a free event.</li>
+      </ul>
+      <h3>When a host invites you as a VIP</h3>
+      <ul>
+        <li>
+          An event&apos;s host (or our team) may add your email address to the event&apos;s VIP list. We then email you a ticket for that event and
+          use your address only for that ticket and updates about the event.
+        </li>
       </ul>
 
       <h3>When you create a host account</h3>
@@ -108,7 +116,11 @@ export default function PrivacyPage() {
       <ul>
         <li>
           <strong>Event hosts:</strong> hosts see how many people booked and checked in to their event. They don&apos;t
-          receive attendees&apos; email addresses from us.
+          receive attendees&apos; email addresses from us (they see only the VIP addresses they added themselves).
+        </li>
+        <li>
+          <strong>Door staff:</strong> when your ticket is scanned at the entrance, staff using our check-in app see your ticket type and a partly hidden
+          email address (for example j***@gmail.com), so they can match the ticket to you.
         </li>
         <li>
           <strong>The organizations a host lists:</strong> when verifying a host, we tell those organizations the host&apos;s

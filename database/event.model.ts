@@ -62,6 +62,8 @@ export interface IEvent {
   approvedSnapshotHash?: string;
   cancelledAt?: Date;
   cancelReason?: string;
+  /** What door staff hand out per ticket tier ("Blue wristband", "Gold badge"). Internal only. */
+  doorTags?: { regular?: string; vip?: string };
   // Exact moments, computed from the local date/time/timezone on save, so events can be
   // sorted and filtered in the database.
   startsAt?: Date;
@@ -190,6 +192,11 @@ const EventSchema = new Schema<IEvent>(
     approvedSnapshotHash: { type: String },
     cancelledAt: { type: Date },
     cancelReason: { type: String, maxlength: 2000 },
+    // select: false keeps door instructions out of public pages and the API unless asked for.
+    doorTags: {
+      type: new Schema({ regular: { type: String, trim: true, maxlength: 60 }, vip: { type: String, trim: true, maxlength: 60 } }, { _id: false }),
+      select: false,
+    },
     startsAt: { type: Date },
     endsAt: { type: Date },
     hideAt: { type: Date },

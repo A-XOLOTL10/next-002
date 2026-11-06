@@ -8,9 +8,9 @@ import Booking from "@/database/booking.model"
 import Event from "@/database/event.model"
 import { baseUrlIsConfigured, getBaseUrl } from "@/lib/base-url"
 import { bookingsTag } from "@/lib/cache-tags"
-import { emailIsConfigured, sendBookingConfirmation, sendBookingVerification, type EmailEvent } from "@/lib/email"
+import { emailIsConfigured, sendBookingVerification, type EmailEvent } from "@/lib/email"
 import { LIMITS, clientIp, consumeAttempt } from "@/lib/rate-limit"
-import { checkInUrl, ticketQrDataUrl, ticketQrPng } from "@/lib/tickets"
+import { checkInUrl, emailTicket, ticketQrDataUrl } from "@/lib/tickets"
 import { hasEnded } from "@/lib/utils"
 
 // No "use cache" in this file: Server Actions write data, and caching a write would
@@ -42,19 +42,6 @@ const EVENT_FIELDS = "title slug date time timezone venue location status endsAt
 const hashToken = (token: string): string => createHash("sha256").update(token).digest("hex")
 
 const failed = (message: string): BookingState => ({ status: "error", message })
-
-/** Emails a ticket with its QR code. Returns whether it was actually sent. */
-async function sendTicket(to: string, ticketId: string, event: EmailEvent): Promise<boolean> {
-  if (!emailIsConfigured()) return false
-  try {
-    const qrPng = await ticketQrPng(checkInUrl(await getBaseUrl(), ticketId))
-    await sendBookingConfirmation({ to, ticketId, qrPng, event })
-    return true
-  } catch (e) {
-    console.error(`Ticket email failed for ${ticketId}:`, e)
-    return false
-  }
-}
 
 /**
  * Step 1. Bound to an eventId in the client: `createBooking.bind(null, eventId)`.
@@ -111,7 +98,7 @@ export async function createBooking(
 
     if (existing?.status === "confirmed") {
       // Lost the ticket? Booking again sends it back to the address it belongs to.
-      const resent = (await emailAllowed()) && (await sendTicket(email, existing.ticketId, event))
+      const resent = (await emailAllowed()) && (await emailTicket(email, existing.ticketId, event, existing.tier === "vip" ? "invited" : undefined))
       return failed(`This email has already booked this event.${resent ? " We've sent your ticket again." : ""}`)
     }
 
@@ -223,7 +210,7 @@ export async function confirmBooking(token: string): Promise<ConfirmState> {
 
   // The ticket is also shown on screen, so a mail failure doesn't lose it.
   const qrDataUrl = await ticketQrDataUrl(checkInUrl(await getBaseUrl(), ticketId))
-  const emailed = await sendTicket(email, ticketId, event)
+  const emailed = await emailTicket(email, ticketId, event)
 
   return { status: "confirmed", ticketId, email, qrDataUrl, emailed }
 }

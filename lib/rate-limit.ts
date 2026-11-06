@@ -26,6 +26,11 @@ export const LIMITS = {
   bookingPerIp: { attempts: 20, windowMs: 60 * MINUTE }, // bots filling in the booking form
   bookingEmail: { attempts: 3, windowMs: 60 * MINUTE }, // flooding someone's inbox with links
   aiImport: { attempts: 10, windowMs: 60 * MINUTE }, // runaway AI costs
+  vipInvite: { attempts: 10, windowMs: 60 * MINUTE }, // VIP list submissions per account (no spamming via VIP lists)
+  scannerScan: { attempts: 1500, windowMs: 60 * MINUTE }, // ticket look-ups per phone (a busy door, not ID guessing)
+  scannerSetup: { attempts: 10, windowMs: 15 * MINUTE }, // scanning link codes / staff passes, per address
+  staffPass: { attempts: 60, windowMs: 60 * MINUTE }, // staff passes issued per admin
+  deviceLinkCode: { attempts: 5, windowMs: 15 * MINUTE }, // guessing the authenticator code to link a phone
 } as const
 
 /**

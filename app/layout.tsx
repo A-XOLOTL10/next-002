@@ -5,7 +5,8 @@ import LightRays from '@/components/LightRays';
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
-import { ViewTransition } from "react";
+import { Suspense, ViewTransition } from "react";
+import BackButton from "@/components/BackButton";
 
 // A fixed year, not new Date(): reading the clock while prerendering is a build error with
 // Cache Components, and the year in a footer doesn't need to be live.
@@ -63,6 +64,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* flex-1: the main area always fills the screen, so the footer stays at the bottom
             instead of rising into view while a page is still loading, then jumping down. */}
         <main className="w-full flex-1">
+          {/* Reads the URL, which on some pages is only known at request time: Suspense keeps the
+              rest of the layout prerendered (the button appears once the page is live). */}
+          <Suspense fallback={null}>
+            <BackButton />
+          </Suspense>
+
           {/* A short, browser-native crossfade between pages (see the view-transition rules in
               globals.css). No animation library, and nothing runs on first load. */}
           <ViewTransition>

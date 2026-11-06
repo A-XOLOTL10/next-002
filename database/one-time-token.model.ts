@@ -1,10 +1,11 @@
 import { Schema, model, models, type Model, type Types } from "mongoose";
 
 // Every short-lived secret sent to someone: email confirmation links, password reset links,
-// admin invites, and the 6-digit codes for unusual sign-ins. Only a hash is stored, each one
+// admin invites, the 6-digit codes for unusual sign-ins, and the QR codes that set up the
+// scanner app (an admin linking their phone, or a staff pass). Only a hash is stored, each one
 // works once, and MongoDB deletes it when it expires.
 
-export const TOKEN_PURPOSES = ["email_verify", "password_reset", "admin_invite", "login_challenge"] as const;
+export const TOKEN_PURPOSES = ["email_verify", "password_reset", "admin_invite", "login_challenge", "device_link", "staff_pass"] as const;
 export type TokenPurpose = (typeof TOKEN_PURPOSES)[number];
 
 export interface IOneTimeToken {

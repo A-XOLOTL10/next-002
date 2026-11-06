@@ -80,6 +80,9 @@ export default async function HostDashboard({ searchParams }: PageProps<"/host">
                   )}
                   <div className="mt-1 flex flex-wrap gap-4 text-sm">
                     {event.status === "published" && <Link href={`/events/${event.slug}`} className="hover:underline">View live page</Link>}
+                    {event.status === "published" && !ended && (
+                      <Link href={`/host/events/${event.slug}/guests`} className="font-semibold hover:underline">VIP guests &amp; door tags</Link>
+                    )}
                     {event.status !== "cancelled" && event.status !== "in_review" && !ended && (
                       <Link href={`/host/events/${event.slug}/edit`} className="font-semibold hover:underline">
                         {event.status === "published" ? "Propose changes" : "Edit"}

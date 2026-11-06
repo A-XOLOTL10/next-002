@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "DevEvent Scanner",
+    "slug": "devevent-scanner",
+    "scheme": "devevent-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#030708",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.devevent.scanner"
+    },
+    "android": {
+      "package": "com.devevent.scanner",
+      "adaptiveIcon": {
+        "backgroundColor": "#030708",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "DevEvent Scanner uses the camera to scan ticket QR codes and setup codes at the event entrance.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "DevEvent Scanner uses Face ID to keep admin access on this phone locked."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

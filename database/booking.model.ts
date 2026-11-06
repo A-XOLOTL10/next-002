@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Schema, model, models, mongo, type Model, type Types } from "mongoose";
 import { Event, isDuplicateKeyError, validationError } from "./event.model";
+import { BOOKING_SOURCES, TICKET_TIERS, type BookingSource, type TicketTier } from "./ticket.constants";
 
 // Events are free, so a booking is "pending" until the visitor clicks the link emailed to
 // them. That proves they own the address (nobody can book with someone else's email) and
@@ -20,6 +21,11 @@ export interface IBooking {
   confirmedAt?: Date;
   /** When the ticket's QR code was scanned at the door. A ticket can only be used once. */
   checkedInAt?: Date;
+  /** Who admitted it: a signed-in account on the website, or a phone running the scanner app. */
+  checkedInBy?: { kind: "web" | "admin_device" | "staff_device"; name: string; deviceId?: Types.ObjectId };
+  /** "vip" when the email is on the event's VIP list. Older bookings have no value: regular. */
+  tier?: TicketTier;
+  source?: BookingSource;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +70,12 @@ const BookingSchema = new Schema<IBooking>(
     verificationExpiresAt: { type: Date },
     confirmedAt: { type: Date },
     checkedInAt: { type: Date },
+    checkedInBy: new Schema(
+      { kind: { type: String, enum: ["web", "admin_device", "staff_device"] }, name: String, deviceId: Schema.Types.ObjectId },
+      { _id: false },
+    ),
+    tier: { type: String, enum: TICKET_TIERS, default: "regular" },
+    source: { type: String, enum: BOOKING_SOURCES, default: "booking" },
   },
   // bufferCommands: false makes queries issued before connectToDatabase() fail immediately instead of hanging.
   { timestamps: true, bufferCommands: false },

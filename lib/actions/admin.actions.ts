@@ -189,7 +189,7 @@ export async function checkInTicket(ticketId: string): Promise<CheckInState> {
     // Only matches a ticket that hasn't been used, so two simultaneous scans can't both pass.
     const admitted = await Booking.findOneAndUpdate(
       { ticketId: ticket.ticketId, status: "confirmed", checkedInAt: { $exists: false } },
-      { $set: { checkedInAt: new Date() } },
+      { $set: { checkedInAt: new Date(), checkedInBy: { kind: "web", name: session.user.name } } },
       { returnDocument: "after" },
     ).lean()
 
