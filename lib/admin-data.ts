@@ -3,6 +3,7 @@ import connectDB from "@/lib/mongodb"
 import Event, { type IEvent } from "@/database/event.model"
 import Booking, { type BookingStatus } from "@/database/booking.model"
 import type { EventStatus, ImageDisplay } from "@/database/event.constants"
+import type { TicketTier } from "@/database/ticket.constants"
 import { requireAdmin, requireUser } from "@/lib/auth"
 import { isAdminRole } from "@/database/user.constants"
 import { findMissingFields } from "@/lib/events.service"
@@ -34,6 +35,8 @@ export type AdminBooking = {
   status: BookingStatus
   bookedAt: string // ISO timestamp
   checkedInAt?: string // ISO timestamp
+  checkedInBy?: string
+  tier: TicketTier
 }
 
 /** Values for the edit form. Lists are already split into items. */
@@ -41,7 +44,7 @@ export type EventFormValues = Partial<
   Pick<
     IEvent,
     | "title" | "description" | "overview" | "venue" | "location" | "date" | "time" | "endDate" | "endTime"
-    | "timezone" | "mode" | "audience" | "organizer" | "agenda" | "tags" | "images"
+    | "timezone" | "mode" | "category" | "audience" | "organizer" | "agenda" | "tags" | "images"
   >
 > & { status: EventStatus; imageDisplay: ImageDisplay }
 
@@ -68,6 +71,9 @@ export type TicketCheckIn = {
   email: string
   status: BookingStatus
   checkedInAt?: string
+  tier: TicketTier
+  /** What to hand this guest at the door, from the event's door tags. */
+  tag?: string
   event: { title: string; date: string; time: string; venue: string; location: string; timezone: string; hideAt?: string } | null
 }
 
@@ -176,6 +182,8 @@ export async function getEventBookings(
       status: b.status,
       bookedAt: b.createdAt.toISOString(),
       checkedInAt: b.checkedInAt?.toISOString(),
+      checkedInBy: b.checkedInBy?.name,
+      tier: b.tier === "vip" ? "vip" : "regular",
     })),
   }
 }
@@ -202,6 +210,7 @@ export async function getEventForEdit(slug: string): Promise<EventFormValues | n
     endTime: event.endTime,
     timezone: event.timezone,
     mode: event.mode,
+    category: event.category,
     audience: event.audience,
     organizer: event.organizer,
     status: event.status,
@@ -228,7 +237,7 @@ export async function getTicketForCheckIn(input: string): Promise<TicketCheckIn 
   const booking = await Booking.findOne({ ticketId }).lean()
   if (!booking) return null
 
-  const event = await Event.findById(booking.eventId).select("title date time venue location timezone hideAt ownerId").lean()
+  const event = await Event.findById(booking.eventId).select("+doorTags title date time venue location timezone hideAt ownerId").lean()
   // A host can't look up (or admit) tickets for someone else's event: answer as if it doesn't exist.
   if (!isAdminRole(session.user.role) && event?.ownerId?.toString() !== session.user.id) return null
 
@@ -237,6 +246,8 @@ export async function getTicketForCheckIn(input: string): Promise<TicketCheckIn 
     email: booking.email,
     status: booking.status,
     checkedInAt: booking.checkedInAt?.toISOString(),
+    tier: booking.tier === "vip" ? "vip" : "regular",
+    tag: event?.doorTags?.[booking.tier === "vip" ? "vip" : "regular"] || undefined,
     event: event && {
       title: event.title,
       date: event.date,

@@ -38,7 +38,7 @@ export type PublishOutcome = {
 
 const TEXT_FIELDS = [
   "title", "description", "overview", "venue", "location", "date", "time",
-  "endDate", "endTime", "timezone", "mode", "audience", "organizer", "imageDisplay",
+  "endDate", "endTime", "timezone", "mode", "audience", "organizer", "imageDisplay", "category",
 ] as const
 
 // FormData has no arrays. Lists arrive as a JSON string ('["a","b"]'), as the same key
@@ -81,7 +81,7 @@ export function parseEventForm(formData: FormData): ParsedForm | ServiceError {
     const value = formData.get(key)
     if (typeof value !== "string") continue
     // "Choose a mode" left unselected on a draft isn't a mode.
-    if (key === "mode" && !value.trim()) continue
+    if ((key === "mode" || key === "category") && !value.trim()) continue
     fields[key] = value
   }
 

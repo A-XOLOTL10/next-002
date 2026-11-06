@@ -77,6 +77,25 @@ Events the team creates itself (Events → Create event, or AI Import) go throug
 
 Each ticket's QR code opens **/t/DEV-XXXXXXXXXX**. A signed-in team member (or the event's own host) lands on the check-in page and presses **Admit**. Each ticket works once; a second scan shows when it was used. You can also type the ticket ID on the Check-in page. Hosts can only see tickets for their own events.
 
+Every check-in shows **VIP** or **Regular** in large type, and the door tag to hand over.
+
+### VIP guests and door tags
+
+On a live event, **VIP guests & door tags** (hosts: on their dashboard; admins: on the event's bookings page):
+
+- **Door tags**: what staff hand out to each kind of guest, e.g. "Blue wristband" and "Gold lanyard". Shown after every scan.
+- **Add VIP guests**: paste email addresses. Each person is emailed a VIP ticket straight away (same QR code and DEV- ID as any ticket; no booking needed). Someone who already booked keeps the same ticket, now marked VIP. Limits: 100 at a time, 300 per event.
+- **Remove**: a ticket that only existed because of the VIP invite is cancelled; someone who booked themselves keeps a regular ticket.
+
+### The DevEvent Scanner app (Console → Mobile app)
+
+The phone app for the door (source and build steps in `mobile/README.md`).
+
+1. **Link your own phone**: enter your authenticator code on the Mobile app page, then scan the QR code with the app ("I'm an admin"). The code works once, for 5 minutes. Your phone needs a screen lock, and the app asks for your fingerprint, face or passcode when it opens, after a minute in the background, and before making a staff pass. You and the super admin are emailed when a phone is linked. It lasts 30 days.
+2. **Give door staff a pass**: choose the event and who it's for, then show the QR code to the staff member, who scans it with **their** phone ("I'm door staff"). Do this on the website or from your linked phone (Menu → Give a staff member a pass). A staff phone can only look up and admit tickets for that one event, sees emails partly hidden, and has no account or settings. It stops when the pass runs out (default: 2 hours after the event ends).
+3. **Never hand your own phone to staff.** A phone linked to an admin is refused a staff pass.
+4. **Lost a phone?** Unlink it under **Linked phones** (or "Sign out all staff phones"). It stops at its next scan. Suspending or removing an admin also stops their phone and every staff pass they made.
+
 ## The activity log (super admin)
 
 **Activity log** in the console. Everything is dated and kept **12 months**, then deleted automatically. Entries can't be edited.

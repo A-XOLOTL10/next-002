@@ -113,6 +113,7 @@ export type HostEventFormValues = {
   endTime?: string
   timezone: string
   mode?: IEvent["mode"]
+  category?: IEvent["category"]
   audience?: string
   organizer?: string
   agenda: string[]
@@ -151,6 +152,7 @@ export async function getHostEventForEdit(userId: string, slug: string): Promise
     endTime: value("endTime"),
     timezone: value("timezone"),
     mode: value("mode"),
+    category: value("category"),
     audience: value("audience"),
     organizer: value("organizer"),
     agenda: toList(value("agenda")),
@@ -206,6 +208,7 @@ async function parseHostExtras(formData: FormData, userId: string, errors: Recor
 function hostSubmitProblems(event: Partial<IEvent>, hasLetter: boolean): Record<string, string> {
   const errors: Record<string, string> = { ...findMissingFields(event) }
   if (!event.hostContact?.name || !event.hostContact.phone || !event.hostContact.email) errors.contactName = "Add the event contact's name, phone and email"
+  if (!event.category) errors.category = "Choose the kind of event"
   if (!event.audienceAge) errors.audienceAge = "Say who the event is for"
   if (event.audienceAge && event.audienceAge !== "adults") {
     if (!event.safeguardingContact?.name || !event.safeguardingContact.phone) errors.safeguardingName = "Events open to under-18s need a named safeguarding contact"

@@ -44,6 +44,7 @@ async function BookingsTable({ params }: Pick<PageProps<"/host/console/events/[s
           <div className="flex flex-wrap gap-4 text-sm">
             <Link href={`/events/${slug}`} className="hover:underline">View public page</Link>
             <Link href={`/host/console/events/${slug}/edit`} className="hover:underline">Edit event</Link>
+            <Link href={`/host/console/events/${slug}/guests`} className="hover:underline">VIP guests &amp; door tags</Link>
             <DeleteEventButton slug={slug} title={event.title} />
           </div>
         </div>
@@ -79,7 +80,10 @@ async function BookingsTable({ params }: Pick<PageProps<"/host/console/events/[s
               {bookings.map((booking, index) => (
                 <tr key={booking._id} className="border-dark-200 border-b">
                   <td className="py-3 pr-4">{index + 1}</td>
-                  <td className="py-3 pr-4">{booking.email}</td>
+                  <td className="py-3 pr-4">
+                    {booking.email}
+                    {booking.tier === "vip" && <span className="ml-2 rounded bg-amber-400/20 px-1.5 py-0.5 text-xs font-semibold text-amber-300">VIP</span>}
+                  </td>
                   <td className="py-3 pr-4">
                     {booking.status === "confirmed" ? (
                       <span className="text-green-400">Confirmed</span>

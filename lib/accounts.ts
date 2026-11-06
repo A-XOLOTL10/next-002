@@ -11,6 +11,7 @@ import { completeSignIn, signOutEverywhere, type SignInResult } from "@/lib/auth
 import { emailIsConfigured, sendEmailVerification, sendPasswordReset, sendQuietly, sendSignupExistingAccount } from "@/lib/email"
 import { LIMITS, clientIp, consumeAttempt } from "@/lib/rate-limit"
 import { logAction } from "@/lib/audit"
+import { siteUrl as configuredSiteUrl } from "@/lib/site-url"
 import type { OAuthProfile } from "@/lib/oauth"
 
 // Account life cycle outside the sign-in form itself: Google/GitHub sign-in, email sign-up and
@@ -18,17 +19,20 @@ import type { OAuthProfile } from "@/lib/oauth"
 // (database/one-time-token.model.ts): only its hash is stored, and using it deletes it.
 
 const HOUR = 60 * 60 * 1000
-const TOKEN_LIFETIME: Record<Exclude<TokenPurpose, "login_challenge">, number> = {
+// Purposes this file emails as links (the others are made in lib/auth.ts and lib/scanner.ts).
+type LinkPurpose = Exclude<TokenPurpose, "login_challenge" | "device_link" | "staff_pass">
+
+const TOKEN_LIFETIME: Record<LinkPurpose, number> = {
   email_verify: 24 * HOUR,
   password_reset: 1 * HOUR,
   admin_invite: 48 * HOUR,
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const siteUrl = (): string => (process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const siteUrl = (): string => configuredSiteUrl() || "http://localhost:3000"
 
 /** Creates a link token for `userId` (replacing older ones for the same purpose) and returns the raw token. */
-export async function issueToken(userId: Types.ObjectId | string, purpose: Exclude<TokenPurpose, "login_challenge">): Promise<string> {
+export async function issueToken(userId: Types.ObjectId | string, purpose: LinkPurpose): Promise<string> {
   const token = randomToken()
   await OneTimeToken.deleteMany({ userId, purpose })
   await OneTimeToken.create({ purpose, tokenHash: sha256(token), userId, expiresAt: new Date(Date.now() + TOKEN_LIFETIME[purpose]) })

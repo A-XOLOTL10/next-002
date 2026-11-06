@@ -3,6 +3,8 @@ import mongoose, { Schema, model, models, mongo, type Model, type Types } from "
 import {
   AUDIENCE_AGES,
   type AudienceAge,
+  EVENT_CATEGORIES,
+  type EventCategory,
   DEFAULT_TIMEZONE,
   EVENT_MODES,
   EVENT_SOURCES,
@@ -34,6 +36,8 @@ export interface IEvent {
   endTime: string; // finish, 24-hour HH:mm
   timezone: string; // IANA, e.g. Africa/Lagos
   mode: EventMode;
+  /** The kind of event; also picks the design brief for AI images (lib/design-categories.ts). */
+  category?: EventCategory;
   audience: string;
   agenda: string[];
   organizer: string;
@@ -58,6 +62,8 @@ export interface IEvent {
   approvedSnapshotHash?: string;
   cancelledAt?: Date;
   cancelReason?: string;
+  /** What door staff hand out per ticket tier ("Blue wristband", "Gold badge"). Internal only. */
+  doorTags?: { regular?: string; vip?: string };
   // Exact moments, computed from the local date/time/timezone on save, so events can be
   // sorted and filtered in the database.
   startsAt?: Date;
@@ -139,6 +145,8 @@ const EventSchema = new Schema<IEvent>(
       validate: { validator: isValidTimezone, message: "{VALUE} is not a valid timezone" },
     },
     mode: { ...publishedString, lowercase: true, enum: EVENT_MODES },
+    // Optional for older and admin-created events; required when a host sends an event for review.
+    category: { type: String, enum: EVENT_CATEGORIES },
     audience: publishedString,
     agenda: publishedStringArray,
     organizer: publishedString,
@@ -184,6 +192,11 @@ const EventSchema = new Schema<IEvent>(
     approvedSnapshotHash: { type: String },
     cancelledAt: { type: Date },
     cancelReason: { type: String, maxlength: 2000 },
+    // select: false keeps door instructions out of public pages and the API unless asked for.
+    doorTags: {
+      type: new Schema({ regular: { type: String, trim: true, maxlength: 60 }, vip: { type: String, trim: true, maxlength: 60 } }, { _id: false }),
+      select: false,
+    },
     startsAt: { type: Date },
     endsAt: { type: Date },
     hideAt: { type: Date },

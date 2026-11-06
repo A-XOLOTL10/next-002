@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/host/console/drafts", label: "Drafts" },
   { href: "/host/console/import", label: "AI Import" },
   { href: "/host/check-in", label: "Check-in" },
+  { href: "/host/console/devices", label: "Mobile app" },
   { href: "/host/console/security", label: "Security" },
 ]
 

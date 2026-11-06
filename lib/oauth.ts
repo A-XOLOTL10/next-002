@@ -1,6 +1,7 @@
 import "server-only"
 import { createHash } from "node:crypto"
 import type { OAuthProvider } from "@/database/user.constants"
+import { siteUrl } from "@/lib/site-url"
 
 // Google and GitHub sign-in (OAuth 2.0 authorization code flow with PKCE).
 //
@@ -53,9 +54,9 @@ export const oauthConfigured = (provider: OAuthProvider): boolean => {
   return Boolean(clientId && clientSecret)
 }
 
-/** The callback address, built only from NEXT_PUBLIC_BASE_URL (never from request headers). */
+/** The callback address, built from the configured site address (never from request headers). */
 export function callbackUrl(provider: OAuthProvider): string {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "")
+  const base = siteUrl()
   if (!base) throw new Error("NEXT_PUBLIC_BASE_URL must be set for Google/GitHub sign-in.")
   return `${base}/api/oauth/${provider}/callback`
 }

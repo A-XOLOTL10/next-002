@@ -92,6 +92,12 @@ async function TicketResult({ input }: { input: string }) {
         <p className="text-red-400">This ticket&apos;s event no longer exists.</p>
       )}
 
+      {/* VIP or regular, and what to hand them, in large type: door staff read it at a glance. */}
+      <div className={`rounded-md px-4 py-3 ${ticket.tier === "vip" ? "bg-amber-400/20 text-amber-300" : "bg-dark-200 text-light-100"}`}>
+        <p className="text-2xl font-bold tracking-wide">{ticket.tier === "vip" ? "VIP" : "Regular"}</p>
+        {ticket.tag && <p className="text-lg font-semibold">Give: {ticket.tag}</p>}
+      </div>
+
       <p className="text-sm">
         <strong className="font-mono">{ticket.ticketId}</strong>
         <br />

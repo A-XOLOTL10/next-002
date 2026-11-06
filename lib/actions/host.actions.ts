@@ -9,7 +9,9 @@ import PrivateFile from "@/database/private-file.model"
 import { actorOf, requireHost, requireUser, signOutEverywhere } from "@/lib/auth"
 import { saveVerification, submitAppeal, cancelHostEvents } from "@/lib/host.service"
 import { cancelEvent, createReport, deleteHostDraft, saveHostEvent } from "@/lib/host-events.service"
-import { generateEventImage, type AiImageStyle, type GenerateResult } from "@/lib/ai-images"
+import { generateEventImage, type GenerateResult } from "@/lib/ai-images"
+import type { DesignStyle } from "@/lib/design-categories"
+import type { EventCategory } from "@/database/event.constants"
 import { hashPassword, verifyPassword } from "@/lib/crypto"
 import { checkNewPassword } from "@/lib/passwords"
 import { logAction } from "@/lib/audit"
@@ -70,13 +72,20 @@ export async function cancelHostEventAction(slug: string, _prev: ActionState, fo
   redirect("/host?notice=cancelled")
 }
 
+/** "Generate image" in the host event form. Inputs are re-checked in generateEventImage. */
 export async function generateImageAction(_prev: GenerateResult | null, formData: FormData): Promise<GenerateResult> {
   const session = await requireHost()
   const references = formData.getAll("references").filter((v): v is File => v instanceof File && v.size > 0)
+  const date = str(formData, "date", 10)
   return generateEventImage(session.user.id, {
-    description: str(formData, "description", 2000),
+    category: str(formData, "category", 40) as EventCategory,
+    style: str(formData, "style", 20) as DesignStyle,
     title: str(formData, "title", 200),
-    style: str(formData, "style", 20) as AiImageStyle,
+    prompt: str(formData, "prompt", 600),
+    description: str(formData, "description", 2000),
+    includeDetails: formData.get("includeDetails") === "on",
+    date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined,
+    city: str(formData, "city", 80) || undefined,
     references,
   })
 }

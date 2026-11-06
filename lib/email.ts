@@ -2,6 +2,11 @@ import "server-only"
 import nodemailer, { type Transporter } from "nodemailer"
 import type { SendMailOptions } from "nodemailer"
 import { formatEventDate } from "@/lib/utils"
+import { siteUrl as configuredSiteUrl } from "@/lib/site-url"
+
+// Every email DevEvent sends, built on one branded layout (renderEmail below) so they all look
+// alike and work in Gmail, Outlook and Apple Mail: table layout, inline styles, no web fonts,
+// and a plain-text version of each. All values from users are escaped before going into HTML.
 
 // Every email DevEvent sends, built on one branded layout (renderEmail below) so they all look
 // alike and work in Gmail, Outlook and Apple Mail: table layout, inline styles, no web fonts,
@@ -57,7 +62,7 @@ export const escapeHtml = (value: string): string =>
 
 const sender = (): string | undefined => (isSet(process.env.EMAIL_FROM) ? process.env.EMAIL_FROM : process.env.SMTP_USER)
 
-const siteUrl = (): string => (process.env.NEXT_PUBLIC_BASE_URL ?? "").replace(/\/$/, "")
+const siteUrl = (): string => configuredSiteUrl()
 
 /** "Saturday, 28 November 2026 at 17:00 (Africa/Lagos)" */
 const describeWhen = (event: EmailEvent): string => `${formatEventDate(event.date)} at ${event.time} (${event.timezone})`
@@ -170,20 +175,31 @@ export async function sendBookingVerification({ to, confirmUrl, event }: { to: s
   })
 }
 
-/** Step 2: the ticket, with its QR code for the door. Throws if the email can't be sent. */
-export async function sendBookingConfirmation({ to, ticketId, qrPng, event }: { to: string; ticketId: string; qrPng: Buffer; event: EmailEvent }): Promise<void> {
+/**
+ * Step 2: the ticket, with its QR code for the door. Throws if the email can't be sent.
+ * `vip`: the host put this address on the VIP list ("invited" when they never booked themselves).
+ * A VIP ticket's QR code is the same as any other; the door scanner looks the tier up.
+ */
+export async function sendBookingConfirmation({ to, ticketId, qrPng, event, vip }: { to: string; ticketId: string; qrPng: Buffer; event: EmailEvent; vip?: "invited" | "upgraded" }): Promise<void> {
   const base = siteUrl()
   await send(
     to,
-    `Your ticket for ${event.title} (${ticketId})`,
+    vip ? `Your VIP ticket for ${event.title} (${ticketId})` : `Your ticket for ${event.title} (${ticketId})`,
     {
-      preview: `Your ticket ${ticketId} for ${event.title}.`,
-      heading: `You're booked for ${event.title}!`,
+      preview: vip ? `You're on the VIP list for ${event.title}. Ticket ${ticketId}.` : `Your ticket ${ticketId} for ${event.title}.`,
+      heading:
+        vip === "invited" ? `You're invited to ${event.title} as a VIP`
+        : vip === "upgraded" ? `You're now a VIP at ${event.title}`
+        : `You're booked for ${event.title}!`,
       // Inline (cid:) image: Gmail and Outlook block data: URLs in images, but show cid: ones.
       trustedHtml: `<p style="text-align:center;margin:8px 0"><img src="cid:ticket-qr" alt="Your ticket QR code" width="220" height="220" style="display:inline-block"></p>
         <p style="text-align:center;margin:0 0 20px;font-size:22px;font-weight:bold;letter-spacing:2px;color:#030708">${escapeHtml(ticketId)}</p>`,
-      paragraphs: ["Show this QR code at the entrance. Each ticket can only be scanned once, so don't share it."],
-      details: [["When", describeWhen(event)], ["Where", `${event.venue}, ${event.location}`]],
+      paragraphs: [
+        ...(vip === "invited" ? ["The organizer has added you to the VIP list, so there's nothing to book: this is your ticket."] : []),
+        ...(vip === "upgraded" ? ["The organizer has added you to the VIP list. Your ticket is the same one you already have; it now shows as VIP at the door."] : []),
+        "Show this QR code at the entrance. Each ticket can only be scanned once, so don't share it.",
+      ],
+      details: [["When", describeWhen(event)], ["Where", `${event.venue}, ${event.location}`], ...(vip ? [["Ticket", "VIP"] as [string, string]] : [])],
       button: base ? { label: "View event details", url: `${base}/events/${event.slug}` } : undefined,
     },
     { attachments: [{ filename: `${ticketId}.png`, content: qrPng, contentType: "image/png", cid: "ticket-qr" }] },
@@ -274,6 +290,18 @@ export async function sendNewSignInAlert(to: string[], { name, email, place, dev
     details: [["When", at.toUTCString()], ["Device", device], ["Location", place]],
     button: siteUrl() ? { label: "Review active sessions", url: `${siteUrl()}/host/console/security` } : undefined,
     footnote: "If this wasn't expected, suspend the account from the Team page and sign it out everywhere.",
+  }, { bcc: true })
+}
+
+/** To the admin (and the super admin) when a phone is linked to an admin account in the scanner app. */
+export async function sendDeviceLinkedAlert(to: string[], { name, email, device, place, at }: { name: string; email: string; device: string; place: string; at: Date }): Promise<void> {
+  await send(to, `Phone linked to ${name}'s admin account`, {
+    preview: `${device} can now check tickets in as ${name}.`,
+    heading: "A phone was linked to an admin account",
+    paragraphs: [`${name} (${email}) linked a phone to the DevEvent Scanner app. It can check tickets in and hand out staff passes until it's unlinked or 30 days pass.`],
+    details: [["When", at.toUTCString()], ["Phone", device], ["Location", place]],
+    button: siteUrl() ? { label: "See linked phones", url: `${siteUrl()}/host/console/devices` } : undefined,
+    footnote: "If this wasn't expected, unlink the phone from the Mobile app page straight away.",
   }, { bcc: true })
 }
 

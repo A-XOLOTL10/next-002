@@ -32,8 +32,8 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/admin/event
 
         // A ticket only becomes valid once the visitor confirms their email.
         const rows = [
-            ["Email", "Status", "Ticket ID", "Booked At (UTC)", "Checked In At (UTC)"],
-            ...data.bookings.map((b) => [b.email, b.status, b.status === "confirmed" ? b.ticketId : "", b.bookedAt, b.checkedInAt ?? ""]),
+            ["Email", "Status", "Ticket", "Ticket ID", "Booked At (UTC)", "Checked In At (UTC)", "Checked In By"],
+            ...data.bookings.map((b) => [b.email, b.status, b.tier === "vip" ? "VIP" : "Regular", b.status === "confirmed" ? b.ticketId : "", b.bookedAt, b.checkedInAt ?? "", b.checkedInBy ?? ""]),
         ];
         const csv = rows.map((row) => row.map(csvField).join(",")).join("\r\n");
 

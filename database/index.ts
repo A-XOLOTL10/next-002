@@ -7,3 +7,5 @@ export { AuditLog, ActivityDay, type IAuditLog } from "./audit-log.model";
 export { HostProfile, type IHostProfile } from "./host-profile.model";
 export { PrivateFile, type IPrivateFile } from "./private-file.model";
 export { EventRevision, Report, type IEventRevision, type IReport } from "./event-revision.model";
+export { VipGuest, type IVipGuest } from "./vip-guest.model";
+export { ScannerDevice, type IScannerDevice } from "./scanner-device.model";
