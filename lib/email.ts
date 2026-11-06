@@ -8,6 +8,10 @@ import { siteUrl as configuredSiteUrl } from "@/lib/site-url"
 // alike and work in Gmail, Outlook and Apple Mail: table layout, inline styles, no web fonts,
 // and a plain-text version of each. All values from users are escaped before going into HTML.
 
+// Every email DevEvent sends, built on one branded layout (renderEmail below) so they all look
+// alike and work in Gmail, Outlook and Apple Mail: table layout, inline styles, no web fonts,
+// and a plain-text version of each. All values from users are escaped before going into HTML.
+
 export type EmailEvent = {
   title: string
   slug: string
